@@ -1,0 +1,210 @@
+{
+  "text": "Morning light spills soft across the floor,\na quiet promise the day has just begun.\nThe coffee steams, a comfort and a door,\nto all the gentle moments yet to come.",
+  "label": "ai",
+  "genre": "poem",
+  "source": "claude",
+  "prompt_id": "poem-raw-01"
+}
+{
+  "text": "The ocean sings its ancient, endless song,\nof tides that rise and fall and rise again.\nBeneath the waves where shadows drift along,\nlie secrets kept from all the ships of men.",
+  "label": "ai",
+  "genre": "poem",
+  "source": "claude",
+  "prompt_id": "poem-raw-02"
+}
+{
+  "text": "Autumn leaves descend in golden streams,\neach one a memory the trees release.\nThey paint the path with all our fading dreams,\nand in their falling, somehow, there is peace.",
+  "label": "ai",
+  "genre": "poem",
+  "source": "claude",
+  "prompt_id": "poem-raw-03"
+}
+{
+  "text": "City lights like scattered stars below,\na thousand windows glowing in the dark.\nEach one a story only it can know,\neach one a small and solitary spark.",
+  "label": "ai",
+  "genre": "poem",
+  "source": "claude",
+  "prompt_id": "poem-raw-04"
+}
+{
+  "text": "Your love is like the stars up in the sky,\nforever shining, never burning out.\nAnd when I'm near you, time goes drifting by,\nfor you are what my heart is all about.",
+  "label": "ai",
+  "genre": "poem",
+  "source": "claude",
+  "prompt_id": "poem-raw-05"
+}
+{
+  "text": "Spring brings the blossoms.\nSummer brings the longest days.\nFall and winter rest.",
+  "label": "ai",
+  "genre": "poem",
+  "source": "claude",
+  "prompt_id": "poem-raw-06"
+}
+{
+  "text": "The clock has been wrong for eleven years.\nI keep it anyway. 4:52,\nforever, on the kitchen wall, a small\nstubborn argument with the rest of the house.",
+  "label": "ai",
+  "genre": "poem",
+  "source": "claude",
+  "prompt_id": "poem-edited-01"
+}
+{
+  "text": "Snow.\nThe black branch holds it the way\na hand holds something it does not want\nbut cannot put down.",
+  "label": "ai",
+  "genre": "poem",
+  "source": "claude",
+  "prompt_id": "poem-edited-02"
+}
+{
+  "text": "We packed your sweaters into the blue bag.\nThe dog still checks the door at six o'clock.\nGrief is mostly logistics, it turns out —\nwho gets the books, who feeds the cat, who sleeps.",
+  "label": "ai",
+  "genre": "poem",
+  "source": "claude",
+  "prompt_id": "poem-edited-03"
+}
+{
+  "text": "Platform nine. Your coat, too thin for this.\nI said something about the trains running late.\nYou said something about the trains running late.\nNeither of us said the other thing.",
+  "label": "ai",
+  "genre": "poem",
+  "source": "claude",
+  "prompt_id": "poem-edited-04"
+}
+{
+  "text": "The kingdom of Eldoria had not seen a dragon in three hundred years. So when the great shadow passed over the village of Thornwick, the people knew that the old prophecies had finally come to pass. Kira gripped the hilt of her father's sword, her heart pounding. She was only a blacksmith's daughter, but destiny, it seemed, had other plans for her this day.",
+  "label": "ai",
+  "genre": "story",
+  "source": "claude",
+  "prompt_id": "story-raw-01"
+}
+{
+  "text": "Rain hammered the window of my office on the forty-third floor. The dame walked in like trouble wearing a red dress, and trouble was exactly what she was. \"I need you to find someone,\" she said, her voice smoky and low. I lit a cigarette and leaned back. In this city, everybody was looking for someone. The question was always the same: who was looking for them?",
+  "label": "ai",
+  "genre": "story",
+  "source": "claude",
+  "prompt_id": "story-raw-02"
+}
+{
+  "text": "The starship Perseus drifted through the silent void, its engines humming a song older than the stars themselves. Captain Reyes stared at the viewscreen, where an unknown planet glowed an impossible shade of blue. \"Scan complete,\" the AI announced. \"Detecting life signs.\" Reyes felt a chill run down her spine. After two years of searching, they were no longer alone in the universe.",
+  "label": "ai",
+  "genre": "story",
+  "source": "claude",
+  "prompt_id": "story-raw-03"
+}
+{
+  "text": "She wasn't supposed to spill her coffee on a stranger that morning. But when their eyes met — his warm and brown, hers wide with apology — something shifted in the air between them. \"I'm so sorry,\" she stammered. He just laughed, a sound like sunshine. \"Best thing that's happened to me all week,\" he said. And somehow, she knew her life would never be the same again.",
+  "label": "ai",
+  "genre": "story",
+  "source": "claude",
+  "prompt_id": "story-raw-04"
+}
+{
+  "text": "The cabin had been empty for years, or so the realtor claimed. But as the four friends settled in for the weekend, the floorboards creaked with footsteps that weren't their own. Jake told everyone to calm down. It was just an old house, he said. Then the lights went out, and from the darkness of the basement came a sound none of them would ever forget.",
+  "label": "ai",
+  "genre": "story",
+  "source": "claude",
+  "prompt_id": "story-raw-05"
+}
+{
+  "text": "Maddie had exactly four minutes to get to chemistry class, and her locker wouldn't open. Again. \"Need a hand?\" She looked up to see the new kid, the one everyone had been whispering about. He gave the locker a sharp knock and it popped right open. \"Magic,\" he grinned. Maddie rolled her eyes, but she was smiling too, and her whole day suddenly felt different.",
+  "label": "ai",
+  "genre": "story",
+  "source": "claude",
+  "prompt_id": "story-raw-06"
+}
+{
+  "text": "My mother rinsed the same plate three times. I didn't tell her I'd watched her do it. The kitchen smelled of the lemon soap she'd used my whole life, the one she bought in bulk because what if they stopped making it. Outside, my father was doing something to the gutter that did not need doing. We were all very busy that afternoon, being a family that did not talk about the letter on the table.",
+  "label": "ai",
+  "genre": "story",
+  "source": "claude",
+  "prompt_id": "story-edited-01"
+}
+{
+  "text": "He buttered the toast to the very edges. This was the kind of man he was now, a man who buttered to the edges, who had time. The pension had seen to that. Forty-one years of other people's schedules and now the morning belonged to him and the radio and the cat who did not care that he had ever worked at all.",
+  "label": "ai",
+  "genre": "story",
+  "source": "claude",
+  "prompt_id": "story-edited-02"
+}
+{
+  "text": "March 1917. Dear Tom — they have us digging again, though the ground is more water than earth. Pearson lost a boot to it yesterday and we laughed for a full minute, which was the best minute we have had. I do not write about the rest. Tell Mother the scarf arrived. Tell her I wore it. I did not wear it; I gave it to a boy from Leeds who had none, but tell her I wore it.",
+  "label": "ai",
+  "genre": "story",
+  "source": "claude",
+  "prompt_id": "story-edited-03"
+}
+{
+  "text": "The mango seller weighed nothing but air and still charged me for it, grinning, gold tooth catching the wet light. Everyone in the market knew the trick and everyone paid it. It was not about mangoes. My grandmother used to say some debts you pay just to keep a man smiling at you across the same stall for thirty years.",
+  "label": "ai",
+  "genre": "story",
+  "source": "claude",
+  "prompt_id": "story-edited-04"
+}
+{
+  "text": "Boost Your Productivity with These 5 Simple Habits\n\nIn today's fast-paced world, staying productive can feel like an uphill battle. But the good news is that small changes can make a big difference! Here are five simple habits to transform your workflow. First, start your day with a clear to-do list. Second, tackle your most important task first. Third, take regular breaks to recharge. Fourth, minimize distractions by silencing notifications. And finally, remember to celebrate your wins, no matter how small. By incorporating these habits into your routine, you'll be amazed at how much more you can accomplish!",
+  "label": "ai",
+  "genre": "blog",
+  "source": "claude",
+  "prompt_id": "blog-raw-01"
+}
+{
+  "text": "A Journey Through Kyoto: A Must-Visit Destination\n\nNestled in the heart of Japan, Kyoto is a city that seamlessly blends ancient tradition with modern charm. From its breathtaking temples to its serene bamboo forests, there's something for everyone in this magical destination. Be sure to visit the iconic Fushimi Inari shrine, with its thousands of vibrant red gates. Don't forget to sample the local cuisine, which is a feast for both the eyes and the palate. Whether you're a history buff or a nature lover, Kyoto is sure to leave a lasting impression.",
+  "label": "ai",
+  "genre": "blog",
+  "source": "claude",
+  "prompt_id": "blog-raw-02"
+}
+{
+  "text": "Eating healthy doesn't have to be complicated. By making a few mindful choices, you can nourish your body and feel your best every single day. Focus on whole foods like fruits, vegetables, and lean proteins. Stay hydrated by drinking plenty of water throughout the day. And most importantly, listen to your body and give it what it needs. Your health is your greatest wealth, so treat it with the care it deserves!",
+  "label": "ai",
+  "genre": "blog",
+  "source": "claude",
+  "prompt_id": "blog-raw-03"
+}
+{
+  "text": "Understanding Machine Learning: A Beginner's Guide\n\nMachine learning is one of the most exciting fields in technology today. But what exactly is it? At its core, machine learning is a type of artificial intelligence that allows computers to learn from data without being explicitly programmed. There are three main types: supervised learning, unsupervised learning, and reinforcement learning. Each has its own unique applications and benefits. As this technology continues to evolve, it's shaping the future in ways we're only beginning to understand.",
+  "label": "ai",
+  "genre": "blog",
+  "source": "claude",
+  "prompt_id": "blog-raw-04"
+}
+{
+  "text": "Starting a garden is one of the most rewarding hobbies you can pick up! Whether you have a sprawling backyard or a tiny balcony, anyone can enjoy the joys of gardening. Begin with easy-to-grow plants like tomatoes, herbs, or marigolds. Make sure your plants get plenty of sunlight and water. With a little patience and care, you'll soon be enjoying the fruits of your labor. Happy gardening!",
+  "label": "ai",
+  "genre": "blog",
+  "source": "claude",
+  "prompt_id": "blog-raw-05"
+}
+{
+  "text": "Discover the transformative power of meditation. In our busy lives, taking just a few minutes each day to be present can have profound benefits for both your mind and body. Studies show that regular meditation can reduce stress, improve focus, and promote a sense of inner peace. You don't need any special equipment — just a quiet space and an open mind. So why not give it a try? Your future self will thank you.",
+  "label": "ai",
+  "genre": "blog",
+  "source": "claude",
+  "prompt_id": "blog-raw-06"
+}
+{
+  "text": "Saving money is easier than you think.",
+  "label": "ai",
+  "genre": "blog",
+  "source": "claude",
+  "prompt_id": "blog-raw-07"
+}
+{
+  "text": "I started running in January for the worst reason, which is that someone I disliked had started running. Three weeks in I hated it less. Three months in I caught myself looking forward to the part of the loop where the road goes under the highway and everything gets loud and then suddenly quiet. I never lost the weight I said I wanted to lose. I lost something else, a low background hum I'd had for years and assumed was just my personality.",
+  "label": "ai",
+  "genre": "blog",
+  "source": "claude",
+  "prompt_id": "blog-edited-01"
+}
+{
+  "text": "Everyone keeps writing think-pieces about whether remote work is good or bad, as if it's a referendum and not just a Tuesday. Here is my unscientific take after four years of it: the problem was never the location. The problem is that we replaced the parts of an office that were quietly load-bearing — the overheard answer, the eight-second hallway question — with thirty-minute calendar invites, and then acted surprised that everyone is tired.",
+  "label": "ai",
+  "genre": "blog",
+  "source": "claude",
+  "prompt_id": "blog-edited-02"
+}
+{
+  "text": "We moved to a city I will not name because I'm still annoyed at it. The boxes are mostly unpacked. The cat has chosen a windowsill. What nobody tells you about moving as an adult is that you don't lose your old friends in a dramatic way; you lose them in the gap between \"we should call\" and actually calling, a gap that turns out to be most of a year wide.",
+  "label": "ai",
+  "genre": "blog",
+  "source": "claude",
+  "prompt_id": "blog-edited-03"
+}

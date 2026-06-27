@@ -1,0 +1,210 @@
+{
+  "text": "The wind is catching on the wire,\nA silver note across the plain.\nWe sit beside the dying fire,\nAnd listen to the coming rain.",
+  "label": "ai",
+  "genre": "poem",
+  "source": "gemini",
+  "prompt_id": "poem-raw-01"
+}
+{
+  "text": "Midnight grease on a chipped white plate,\nThe diner hums a low refrain.\nHe checked his watch; it's getting late,\nBut coffee numbs the creeping pain.",
+  "label": "ai",
+  "genre": "poem",
+  "source": "gemini",
+  "prompt_id": "poem-edited-02"
+}
+{
+  "text": "Golden leaves fall to the ground,\nWithout a single human sound.\nWinter whispers in the breeze,\nChilling all the ancient trees.",
+  "label": "ai",
+  "genre": "poem",
+  "source": "gemini",
+  "prompt_id": "poem-raw-03"
+}
+{
+  "text": "A moth bumped twice against the screen.\nOutside, the summer smelled of tar and dill.\nYou asked me what the silence meant;\nI said it meant the world was standing still.",
+  "label": "ai",
+  "genre": "poem",
+  "source": "gemini",
+  "prompt_id": "poem-edited-04"
+}
+{
+  "text": "The ocean waves crash on the shore,\nA rhythmic beat forevermore.\nThe salty air, the open sky,\nWhere seagulls spread their wings and fly.",
+  "label": "ai",
+  "genre": "poem",
+  "source": "gemini",
+  "prompt_id": "poem-raw-05"
+}
+{
+  "text": "Steel and glass against the blue,\nMorning brings the world anew.\nCommuters rush through iron gates,\nTo meet their ordinary fates.",
+  "label": "ai",
+  "genre": "poem",
+  "source": "gemini",
+  "prompt_id": "poem-raw-06"
+}
+{
+  "text": "The soup needs salt.\nThe radiator clicks, a rusty throat.\nWe watch the gray fog swallow up the pier.\nNothing left to say.",
+  "label": "ai",
+  "genre": "poem",
+  "source": "gemini",
+  "prompt_id": "poem-edited-07"
+}
+{
+  "text": "Sizzling garlic in the pan,\nCooking since the day began.\nFlavors blend and spirits rise,\nUnderneath the evening skies.",
+  "label": "ai",
+  "genre": "poem",
+  "source": "gemini",
+  "prompt_id": "poem-raw-08"
+}
+{
+  "text": "Lost inside a dusty book,\nTaking one more backward look.\nPages yellowed, ink faded deep,\nSecrets that the bindings keep.",
+  "label": "ai",
+  "genre": "poem",
+  "source": "gemini",
+  "prompt_id": "poem-raw-09"
+}
+{
+  "text": "Old leather boots on gravel tracks,\nHeavy burdens on our backs.\nThe mountain peak is miles away,\nBut we will walk another day.",
+  "label": "ai",
+  "genre": "poem",
+  "source": "gemini",
+  "prompt_id": "poem-raw-10"
+}
+{
+  "text": "The kitchen was quiet except for the steady drip of the faucet, a rhythmic ticking that measured out the empty afternoon. Martha turned the old brass key in the drawer, her fingers trembling slightly. Inside lay the blue silk ribbon, untouched for thirty years. It still smelled faintly of lavender and cedar, a sharp contrast to the damp dust of the old house. She held it to the light, wondering if the memories it carried were truly hers or just stories she had told herself to survive the long winters.",
+  "label": "ai",
+  "genre": "story",
+  "source": "gemini",
+  "prompt_id": "story-raw-01"
+}
+{
+  "text": "Leo didn't mind the rain; in fact, he preferred it when the cobblestones turned slick and black under the streetlamps. His small bakery was finally empty, the last loaf of sourdough sold to a hurried woman with a broken umbrella. He wiped down the flour-dusted counter with a damp rag, humming an old tune his grandfather used to sing. The warmth from the deck ovens still lingered in the air, thick with the comforting scent of caramelized yeast and roasted grains. For a moment, the entire world felt safe.",
+  "label": "ai",
+  "genre": "story",
+  "source": "gemini",
+  "prompt_id": "story-raw-02"
+}
+{
+  "text": "The train squealed to a halt at Platform 4, spitting a cloud of rusted brake dust over my scuffed boots. It wasn't the express. It was the local mule of a commuter line, three coaches painted a peeling, generic green. I found a window seat where the glass had gone slightly cloudy in the corner. Through the blur, the suburbs faded into yellow weeds. Across the aisle, a man was peeling an orange with his thumbnail, releasing a sharp, sweet spray of citrus that didn't belong in a car smelling of wet wool.",
+  "label": "ai",
+  "genre": "story",
+  "source": "gemini",
+  "prompt_id": "story-edited-03"
+}
+{
+  "text": "The map was wrong. It showed a river where there was only a dry, boulder-strewn ravine. Elena adjusted the straps of her heavy pack, squinting against the harsh midday sun that beat down on the canyon. She had been walking since dawn, guided by nothing but a vague promise and an old compass that tended to stick near north. Her water canteen sloshed discouragingly light against her hip, a reminder that mistakes out here were rarely forgiven by the desert.",
+  "label": "ai",
+  "genre": "story",
+  "source": "gemini",
+  "prompt_id": "story-raw-04"
+}
+{
+  "text": "Julian adjusted his tie in the reflection of the glass skyscraper, watching the sea of identical suits move past him. Today was the interview he had prepared for all semester, yet his mind kept wandering back to the quiet riverbank behind his childhood home. He remembered the feel of the cool mud between his toes and the simple joy of catching frogs in plastic buckets. Now, the air tasted of exhaust and air conditioning, and the sky was barely visible between the towering monuments of corporate ambition.",
+  "label": "ai",
+  "genre": "story",
+  "source": "gemini",
+  "prompt_id": "story-raw-05"
+}
+{
+  "text": "The dog, a scruffy terrier mix with a missing left ear, wouldn't stop digging at the root of the dead elm. Clara watched from the porch, her coffee mug warming her palms against the October chill. It wasn't a bone. When she finally walked down the gravel path to look, she saw a corner of dull tin poking through the black dirt. It was a tobacco can, sealed tight with electrical tape that had turned brittle and gray. She shook it once; it rattled with the heavy, distinct sound of loose coins.",
+  "label": "ai",
+  "genre": "story",
+  "source": "gemini",
+  "prompt_id": "story-edited-06"
+}
+{
+  "text": "Every morning, the clockmaker examined his domain with meticulous care. Hundreds of tiny gears, springs, and levers ticked in a chaotic symphony that somehow made perfect sense to him. He loved the predictability of mechanics; gears never lied, and springs never broke their promises without a structural reason. As he picked up his magnifying loupe to work on a gold pocket watch, he felt a deep sense of peace knowing that, inside this shop, time was something he could truly control.",
+  "label": "ai",
+  "genre": "story",
+  "source": "gemini",
+  "prompt_id": "story-raw-07"
+}
+{
+  "text": "The sea was flat today, a sheet of dull pewter matching the sky. Old man Thomas hauled the third lobster pot over the gunwale, his oilskins dripping with gray Atlantic water. Empty. Just a couple of angry rock crabs rattling their claws against the wood slats. He tossed them back, watching them sink into the murk. His knuckles ached from the salt rheum, a steady throb that told him a real northeaster was brewing for Tuesday, no matter what the radio said.",
+  "label": "ai",
+  "genre": "story",
+  "source": "gemini",
+  "prompt_id": "story-edited-08"
+}
+{
+  "text": "They found the old telescope in the attic, buried beneath a pile of moldy quilts and forgotten holiday decorations. Toby wiped the thick dust from the brass barrel with his sleeve, revealing an intricate engraving of constellations. His sister pulled open the skylight, letting the crisp night air rush into the cramped space. Together, they aimed the lens toward the crescent moon, holding their breath as the craters and silver ridges suddenly jumped into sharp, breathtaking focus before their very eyes.",
+  "label": "ai",
+  "genre": "story",
+  "source": "gemini",
+  "prompt_id": "story-raw-09"
+}
+{
+  "text": "The market stall was alive with colors and sounds that overwhelmed the senses. Pyramids of bright red spices stood next to woven baskets of figs, while vendors shouted their prices to the passing crowds. Maya squeezed through the narrow aisle, her hand tightly gripping her purse. She was searching for a specific vendor, an old man who supposedly sold genuine silk threads from the East. When she finally found him tucked away in a dark corner, he merely smiled and gestured toward a hidden drawer.",
+  "label": "ai",
+  "genre": "story",
+  "source": "gemini",
+  "prompt_id": "story-raw-10"
+}
+{
+  "text": "There is a unique kind of magic in waking up before the rest of the world. At 5:00 AM, the streets are empty of cars, the sidewalk is cool, and the air feels clean and unburdened by the day's upcoming chaos. For many people, this time is reserved for extra sleep, but dedicating it to a quiet morning routine can completely transform your relationship with time. Whether you choose to read a chapter of a book, enjoy a cup of coffee without checking your phone, or simply sit on the porch and listen to the birds, this intentional space belongs entirely to you. It allows you to start your day proactively rather than reactively, building a sense of internal peace that stays with you long after the rush hour begins.",
+  "label": "ai",
+  "genre": "blog",
+  "source": "gemini",
+  "prompt_id": "blog-raw-01"
+}
+{
+  "text": "I used to think that baking bread was a complicated science reserved for professional pastry chefs and artisanal bakers. However, after months of experimenting in my own cramped kitchen, I discovered that the true secret to a perfect loaf is simply patience. Bread requires time to develop flavor and texture, and rushing the fermentation process is the quickest way to end up with a dense, disappointing brick. When you slow down and let the yeast do its work naturally, the rewards are incredible. There is nothing quite like pulling a golden, crackling loaf of sourdough out of your own oven, knowing that you created something beautiful from nothing more than flour, water, salt, and time.",
+  "label": "ai",
+  "genre": "blog",
+  "source": "gemini",
+  "prompt_id": "blog-raw-02"
+}
+{
+  "text": "My grandmother's recipe book isn't a book at all. It's an explosion of index cards stained with lard and spilled vanilla extract, held together by a rubber band that's lost its stretch. Yesterday I tried her plum cake. The instructions just said 'add flour until it looks right,' which is incredibly unhelpful when you're used to digital scales. But baking by feel changes how you look at food. You stop measuring and start noticing the exact moment the batter gets heavy enough to coat the back of a wooden spoon. It's messy, imperfect, and absolutely delicious.",
+  "label": "ai",
+  "genre": "blog",
+  "source": "gemini",
+  "prompt_id": "blog-edited-03"
+}
+{
+  "text": "In our fast-paced digital world, the simple act of writing by hand has become a lost art form. Most of our communication happens through glowing screens, typed out in sterile fonts on plastic keyboards or glass displays. But there is a profound psychological connection that occurs when we put pen to paper. The physical friction of the nib against the page forces our brains to slow down and think more deeply about the words we choose. Journaling by hand allows for a level of raw emotional expression that typing simply cannot replicate, offering a tangible record of our thoughts that we can hold in our hands for years to come.",
+  "label": "ai",
+  "genre": "blog",
+  "source": "gemini",
+  "prompt_id": "blog-raw-04"
+}
+{
+  "text": "If you want to enjoy a city, avoid the main plaza. Walk three blocks out until the souvenir shops turn into laundromats and small hardware stores.",
+  "label": "ai",
+  "genre": "blog",
+  "source": "gemini",
+  "prompt_id": "blog-edited-05"
+}
+{
+  "text": "Travel is often romanticized as a series of postcard-perfect moments, but the reality is that the best travel experiences often come from unexpected disruptions. When a train is delayed, a reservation gets canceled, or you find yourself hopelessly lost in a city where you don't speak the language, you are forced to step outside your comfort zone. These moments of vulnerability open the door to genuine human connection and spontaneous adventure. You might discover a hidden neighborhood bistro, strike up a conversation with a friendly local, or learn something new about your own resilience. Next time your travel plans fall apart, take a deep breath and embrace the detour.",
+  "label": "ai",
+  "genre": "blog",
+  "source": "gemini",
+  "prompt_id": "blog-raw-06"
+}
+{
+  "text": "We've all heard the advice to declutter our physical spaces for a clearer mind, but we often ignore the digital clutter that fills our daily lives. Unused apps, thousands of unread emails, and disorganized desktop files create a subtle but constant stream of mental background noise. Conducting a regular digital detox can significantly reduce your stress levels and improve your focus. Start small by turning off non-essential notifications, clearing out your phone's camera roll, and unsubscribing from newsletters you no longer read. By creating a more intentional digital environment, you free up valuable cognitive energy for the things that truly matter.",
+  "label": "ai",
+  "genre": "blog",
+  "source": "gemini",
+  "prompt_id": "blog-raw-07"
+}
+{
+  "text": "I have this old wool sweater from a thrift shop in Maine. It's a slightly hideous shade of oatmeal, and the left cuff is unravelling so there's always a loose thread trailing behind me. It looks terrible in photos. But every October, when the damp cold starts seeping through the floorboards of my apartment, it's the first thing I reach for. It has outlasted three different smartphones and two apartment moves, mostly because it doesn't try to be anything other than warm. Sometimes, that's exactly the kind of utility we need to look for in our belongings.",
+  "label": "ai",
+  "genre": "blog",
+  "source": "gemini",
+  "prompt_id": "blog-edited-08"
+}
+{
+  "text": "Building a lifelong reading habit doesn't require hours of uninterrupted free time every day; it simply requires consistency. Many people believe they are too busy to read, but if you look closely at your daily routine, you will find dozens of hidden pockets of time. Reading just fifteen pages a day, whether during your morning commute, on your lunch break, or right before bed, adds up to over twenty books a year. The key is to always carry a book with you and to choose stories that genuinely capture your interest rather than books you feel obligated to read. By making reading a natural extension of your day, you open up endless worlds of knowledge.",
+  "label": "ai",
+  "genre": "blog",
+  "source": "gemini",
+  "prompt_id": "blog-raw-09"
+}
+{
+  "text": "The modern workplace often prioritizes constant busyness over actual productivity, leading to widespread burnout and creative exhaustion. True innovation requires periods of rest and reflection, spaces where the mind is free to wander without the pressure of an immediate deadline or metric. When we constantly push ourselves to produce, we end up relying on familiar patterns and safe ideas rather than exploring new possibilities. Organizations that encourage their employees to take breaks, unplug during vacations, and respect boundaries often see a dramatic increase in both morale and high-quality output. Rest is not the enemy of work; it is the essential foundation that makes meaningful work possible.",
+  "label": "ai",
+  "genre": "blog",
+  "source": "gemini",
+  "prompt_id": "blog-raw-10"
+}
