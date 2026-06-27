@@ -1,10 +1,15 @@
+import asyncio
 import uuid
 from datetime import datetime, timezone
 
+from dotenv import load_dotenv
 from fastapi import FastAPI
 
+from app import confidence, llm_signal, stylometry
 from app.audit import append as audit_append, read as audit_read
 from app.schemas import SubmitRequest, SubmitResponse
+
+load_dotenv()
 
 MIN_TEXT_CHARS = 100
 
@@ -35,15 +40,25 @@ async def submit(req: SubmitRequest) -> SubmitResponse:
             status="classified",
         )
     else:
-        # TODO: fan out to stylometry + LLM, calibrate, fuse, derive label.
+        # Fan out: stylometry on CPU, LLM over HTTP. asyncio.to_thread lets the
+        # sync stylometry call yield the loop while the Groq round-trip runs.
+        sty_features, llm_result = await asyncio.gather(
+            asyncio.to_thread(stylometry.score, req.text),
+            llm_signal.score(req.text),
+        )
+
+        p_sty = confidence.calibrate_stylometry(sty_features.raw_score)
+        p_llm = confidence.calibrate_llm(llm_result.vote)
+        fused = confidence.fuse(p_sty, p_llm)
+
         response = SubmitResponse(
             content_id=content_id,
             creator_id=req.creator_id,
             timestamp=timestamp,
-            attribution="uncertain",
-            confidence=0.5,
-            stylometry_score=0.5,
-            llm_score=0.5,
+            attribution=fused.attribution,
+            confidence=round(fused.confidence, 4),
+            stylometry_score=round(fused.stylometry_score, 4) if fused.stylometry_score is not None else None,
+            llm_score=round(fused.llm_score, 4) if fused.llm_score is not None else None,
             status="classified",
         )
 
