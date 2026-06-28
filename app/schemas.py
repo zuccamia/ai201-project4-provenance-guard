@@ -19,4 +19,18 @@ class SubmitResponse(BaseModel):
     confidence: Optional[float] = None
     stylometry_score: Optional[float] = None
     llm_score: Optional[float] = None
+    label_text: str
     status: str = "classified"
+
+
+class AppealRequest(BaseModel):
+    content_id: str = Field(..., description="content_id from a prior /submit response.")
+    appeal_reasoning: str = Field(..., min_length=1, max_length=2000,
+                                   description="Why the creator believes the result is wrong.")
+
+
+class AppealResponse(BaseModel):
+    content_id: str
+    appeal_id: str
+    timestamp: str
+    status: str = "under_review"

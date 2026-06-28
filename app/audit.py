@@ -20,6 +20,26 @@ def append(entry: dict[str, Any]) -> None:
             f.write(line + "\n")
 
 
+def find_by_content_id(content_id: str) -> list[dict[str, Any]]:
+    """Return every audit entry referencing this content_id, oldest first.
+    Used by /appeal to confirm the content exists before recording the appeal."""
+    if not AUDIT_PATH.exists():
+        return []
+    entries: list[dict[str, Any]] = []
+    with AUDIT_PATH.open("r", encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                entry = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if entry.get("content_id") == content_id:
+                entries.append(entry)
+    return entries
+
+
 def read(limit: int | None = None) -> list[dict[str, Any]]:
     """Return audit entries newest-first, optionally capped at `limit`."""
     if not AUDIT_PATH.exists():
