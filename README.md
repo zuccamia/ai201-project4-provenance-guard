@@ -65,40 +65,6 @@ A service that classifies a piece of text as human-written or AI-generated and r
 
 OpenAPI-style summary of the exposed endpoints:
 
-### `GET /health`
-- **Summary:** Liveness check.
-- **Response `200`:**
-
-```json
-{ "status": "ok" }
-```
-
-### `GET /log`
-- **Summary:** Return recent audit-log entries for inspection.
-- **Query parameters:**
-  - `limit` (`integer`, optional, default `100`) — maximum number of entries to return.
-- **Response `200`:**
-
-```json
-{
-  "entries": [
-    {
-      "content_id": "...",
-      "creator_id": "...",
-      "timestamp": "...",
-      "attribution": "uncertain",
-      "confidence": 0.51,
-      "stylometry_score": 0.67,
-      "llm_score": 0.15,
-      "binoculars_score": 0.20,
-      "binoculars_tier": "likely_human",
-      "label_text": "...",
-      "status": "classified"
-    }
-  ]
-}
-```
-
 ### `POST /submit`
 - **Summary:** Classify a text submission and return fused attribution plus per-signal detail.
 - **Rate limits:** `10/minute` and `100/hour` per IP.
@@ -158,6 +124,40 @@ OpenAPI-style summary of the exposed endpoints:
 
 - **Response `404`:** when `content_id` is not found in the audit log.
 
+### `GET /log`
+- **Summary:** Return recent audit-log entries for inspection.
+- **Query parameters:**
+  - `limit` (`integer`, optional, default `100`) — maximum number of entries to return.
+- **Response `200`:**
+
+```json
+{
+  "entries": [
+    {
+      "content_id": "...",
+      "creator_id": "...",
+      "timestamp": "...",
+      "attribution": "uncertain",
+      "confidence": 0.51,
+      "stylometry_score": 0.67,
+      "llm_score": 0.15,
+      "binoculars_score": 0.20,
+      "binoculars_tier": "likely_human",
+      "label_text": "...",
+      "status": "classified"
+    }
+  ]
+}
+```
+
+### `GET /health`
+- **Summary:** Liveness check.
+- **Response `200`:**
+
+```json
+{ "status": "ok" }
+```
+
 ## Detection signals
 
 Three runtime signals are wired into the orchestrator for the current demo, picked to fail differently. Signal C is best-effort: when the Hugging Face Space is unavailable or the text is too short for that endpoint, the service falls back to the 2-signal system and logs the fallback.
@@ -202,31 +202,41 @@ All three numeric fields in the response (`confidence`, `stylometry_score`, `llm
 
 ### Example submissions
 
-(Scores to be filled in after the next `scripts/calibrate.py` run and real `/submit` calls against the deployed app.)
-
-**High-confidence AI** — a stock-imagery poem:
+**AI-labeled dataset example with live Binoculars participation** — `demo-ai-strong`:
 ```json
 {
-  "text": "City lights like scattered stars below, a thousand windows glowing in the dark...",
-  "attribution": "likely_ai",
-  "confidence": <TBD>,
-  "stylometry_score": <TBD>,
-  "llm_score": <TBD>
-}
-```
-Both signals expected to agree. Spread = <TBD>, expected well under the 0.40 override threshold.
-
-**Lower-confidence (uncertain)** — short casual prose:
-```json
-{
-  "text": "ok so i finally tried that new ramen place downtown and honestly? underwhelming...",
+  "content_id": "1039a9de-6745-455f-9a42-0df47c38279c",
+  "creator_id": "demo-ai-strong",
+  "timestamp": "2026-06-29T06:07:26.896633+00:00",
   "attribution": "uncertain",
-  "confidence": <TBD>,
-  "stylometry_score": <TBD>,
-  "llm_score": <TBD>
+  "confidence": 0.669,
+  "stylometry_score": 0.6323,
+  "llm_score": 0.15,
+  "binoculars_score": 0.8,
+  "binoculars_tier": "likely_ai",
+  "label_text": "Inconclusive. Our checks did not agree, so we are not confident either way. Treat this as no result, not as a verdict. This case is a good candidate for human review.",
+  "status": "classified"
 }
 ```
-55-word casual review. Stylometry's cliche feature is 0 (no clichés in casual prose); LLM correctly votes `low`. Fused score expected to land in the uncertain band or trigger the spread override. System refuses to commit, which is the honest call.
+This is a useful demo case because Binoculars votes strongly `likely_ai` (`0.8`), stylometry also leans AI (`0.6323`), but the LLM vote stays low (`0.15`). The fused score lands above the AI threshold, yet the pairwise spread exceeds the 0.40 disagreement override, so the final attribution is still `uncertain`.
+
+**Human-labeled dataset example with live Binoculars participation** — `demo-human-strong`:
+```json
+{
+  "content_id": "9748f621-5f97-4d36-83f4-f9e14937c779",
+  "creator_id": "demo-human-strong",
+  "timestamp": "2026-06-29T06:08:51.814309+00:00",
+  "attribution": "uncertain",
+  "confidence": 0.2763,
+  "stylometry_score": 0.6188,
+  "llm_score": 0.15,
+  "binoculars_score": 0.2,
+  "binoculars_tier": "likely_human",
+  "label_text": "Inconclusive. Our checks did not agree, so we are not confident either way. Treat this as no result, not as a verdict. This case is a good candidate for human review.",
+  "status": "classified"
+}
+```
+This is the mirror-image demo case: Binoculars votes `likely_human` (`0.2`), the LLM vote is also low (`0.15`), but stylometry stays relatively AI-leaning (`0.6188`). The fused score lands below the human threshold, yet the pairwise spread again exceeds the 0.40 disagreement override, so the system refuses to issue a confident `likely_human` verdict.
 
 ## Transparency label
 
