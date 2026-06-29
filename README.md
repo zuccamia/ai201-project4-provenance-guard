@@ -90,6 +90,8 @@ OpenAPI-style summary of the exposed endpoints:
   "llm_score": 0.1500,
   "binoculars_score": 0.2000,
   "binoculars_tier": "likely_human",
+  "verification_status": "verified_human",
+  "provenance_badge": "Verified human creator",
   "label_text": "Inconclusive. Our checks did not agree, so we are not confident either way. Treat this as no result, not as a verdict. This case is a good candidate for human review.",
   "status": "classified"
 }
@@ -99,6 +101,7 @@ OpenAPI-style summary of the exposed endpoints:
   - `attribution ∈ {likely_ai, likely_human, uncertain, insufficient_text}`
   - `confidence` is the fused calibrated `P(AI)` when classification runs; `null` for `insufficient_text`
   - `binoculars_score` / `binoculars_tier` are `null` when Signal C is skipped or unavailable
+  - `verification_status` / `provenance_badge` reflect creator-level provenance credential state, not the detector verdict
 
 ### `POST /appeal`
 - **Summary:** Append an appeal event for an earlier classification.
@@ -123,6 +126,85 @@ OpenAPI-style summary of the exposed endpoints:
 ```
 
 - **Response `404`:** when `content_id` is not found in the audit log.
+
+### `POST /verify/request`
+- **Summary:** Request a manual-review provenance certificate for a creator.
+- **Request body:**
+
+```json
+{
+  "creator_id": "user-123",
+  "reason": "I want my original writing to display a verified-human badge."
+}
+```
+
+- **Response `200`:**
+
+```json
+{
+  "creator_id": "user-123",
+  "status": "pending",
+  "issued_at": null
+}
+```
+
+### `POST /verify/approve`
+- **Summary:** Demo/admin endpoint to approve a creator as `verified_human`.
+- **Request body:**
+
+```json
+{
+  "creator_id": "user-123",
+  "reason": "Manual review completed."
+}
+```
+
+- **Response `200`:**
+
+```json
+{
+  "creator_id": "user-123",
+  "status": "verified_human",
+  "issued_at": "2026-06-29T02:00:00+00:00"
+}
+```
+
+The resulting certificate is displayed on later `/submit` responses as `verification_status` and `provenance_badge`.
+
+### `GET /analytics`
+- **Summary:** Return aggregate analytics derived from the append-only audit log.
+- **Response `200`:**
+
+```json
+{
+  "detections": {
+    "likely_ai": 0,
+    "likely_human": 0,
+    "uncertain": 12,
+    "insufficient_text": 2,
+    "total_classified": 14
+  },
+  "appeals": {
+    "total_appeals": 0,
+    "overall_appeal_rate": 0.0,
+    "by_original_attribution": {
+      "likely_ai": 0.0,
+      "likely_human": 0.0,
+      "uncertain": 0.0
+    }
+  },
+  "signal_c_usage": {
+    "eligible_submissions": 12,
+    "used_binoculars": 5,
+    "fallback_to_2_signal": 7,
+    "binoculars_usage_rate": 0.4167
+  }
+}
+```
+
+### `GET /analytics/view`
+- **Summary:** Render a simple HTML dashboard for the same analytics summary.
+- **Response `200`:** server-rendered HTML page with cards and tables for detection patterns, appeals, and Signal C usage.
 
 ### `GET /log`
 - **Summary:** Return recent audit-log entries for inspection.

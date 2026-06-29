@@ -5,17 +5,25 @@ from datetime import datetime, timezone
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import HTMLResponse
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
 
-from app import binoculars_signal, confidence, label, llm_signal, stylometry
+from app import analytics, binoculars_signal, confidence, label, llm_signal, provenance, stylometry
 from app.audit import (
     append as audit_append,
     find_by_content_id as audit_find,
     read as audit_read,
 )
-from app.schemas import AppealRequest, AppealResponse, SubmitRequest, SubmitResponse
+from app.schemas import (
+    AppealRequest,
+    AppealResponse,
+    SubmitRequest,
+    SubmitResponse,
+    VerifyRequest,
+    VerifyResponse,
+)
 
 load_dotenv()
 
@@ -46,12 +54,56 @@ async def log(limit: int = 100) -> dict[str, list[dict]]:
     return {"entries": audit_read(limit=limit)}
 
 
+@app.get("/analytics")
+async def analytics_summary() -> dict:
+    return analytics.summarize(audit_read(limit=None))
+
+
+@app.get("/analytics/view", response_class=HTMLResponse)
+async def analytics_view() -> HTMLResponse:
+    summary = analytics.summarize(audit_read(limit=None))
+    return HTMLResponse(content=analytics.render_html(summary))
+
+
+@app.post("/verify/request", response_model=VerifyResponse)
+async def verify_request(req: VerifyRequest) -> VerifyResponse:
+    timestamp = datetime.now(timezone.utc).isoformat()
+    entry = {
+        "creator_id": req.creator_id,
+        "status": "pending",
+        "reason": req.reason,
+        "requested_at": timestamp,
+        "method": "manual_review",
+    }
+    provenance.append_status(entry)
+    audit_append({"event": "verify_request", **entry})
+    return VerifyResponse(creator_id=req.creator_id, status="pending")
+
+
+@app.post("/verify/approve", response_model=VerifyResponse)
+async def verify_approve(req: VerifyRequest) -> VerifyResponse:
+    timestamp = datetime.now(timezone.utc).isoformat()
+    entry = {
+        "creator_id": req.creator_id,
+        "status": "verified_human",
+        "reason": req.reason,
+        "issued_at": timestamp,
+        "method": "manual_review",
+    }
+    provenance.append_status(entry)
+    audit_append({"event": "verify_approve", **entry})
+    return VerifyResponse(creator_id=req.creator_id, status="verified_human", issued_at=timestamp)
+
+
 @app.post("/submit", response_model=SubmitResponse)
 @limiter.limit("10/minute")
 @limiter.limit("100/hour")
 async def submit(request: Request, req: SubmitRequest) -> SubmitResponse:
     content_id = str(uuid.uuid4())
     timestamp = datetime.now(timezone.utc).isoformat()
+    creator_status = provenance.get_creator_status(req.creator_id)
+    verification_status = creator_status.get("status")
+    provenance_badge = "Verified human creator" if verification_status == "verified_human" else None
 
     if len(req.text.strip()) < MIN_TEXT_CHARS:
         attribution = "insufficient_text"
@@ -60,6 +112,8 @@ async def submit(request: Request, req: SubmitRequest) -> SubmitResponse:
             creator_id=req.creator_id,
             timestamp=timestamp,
             attribution=attribution,
+            verification_status=verification_status,
+            provenance_badge=provenance_badge,
             label_text=label.derive(attribution),
             status="classified",
         )
@@ -102,6 +156,8 @@ async def submit(request: Request, req: SubmitRequest) -> SubmitResponse:
             llm_score=round(fused.llm_score, 4) if fused.llm_score is not None else None,
             binoculars_score=round(fused.binoculars_score, 4) if fused.binoculars_score is not None else None,
             binoculars_tier=bino_result.tier,
+            verification_status=verification_status,
+            provenance_badge=provenance_badge,
             label_text=label.derive(fused.attribution),
             status="classified",
         )

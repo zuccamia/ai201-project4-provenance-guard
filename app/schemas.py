@@ -21,6 +21,8 @@ class SubmitResponse(BaseModel):
     llm_score: Optional[float] = None
     binoculars_score: Optional[float] = None
     binoculars_tier: Optional[str] = None
+    verification_status: Optional[str] = None
+    provenance_badge: Optional[str] = None
     label_text: str
     status: str = "classified"
 
@@ -36,3 +38,15 @@ class AppealResponse(BaseModel):
     appeal_id: str
     timestamp: str
     status: str = "under_review"
+
+
+class VerifyRequest(BaseModel):
+    creator_id: str = Field(..., description="Creator identifier requesting verification.")
+    reason: str = Field(..., min_length=1, max_length=1000,
+                        description="Why the creator is requesting verification.")
+
+
+class VerifyResponse(BaseModel):
+    creator_id: str
+    status: str
+    issued_at: Optional[str] = None
