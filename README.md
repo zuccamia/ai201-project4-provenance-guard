@@ -206,6 +206,19 @@ The resulting certificate is displayed on later `/submit` responses as `verifica
 - **Summary:** Render a simple HTML dashboard for the same analytics summary.
 - **Response `200`:** server-rendered HTML page with cards and tables for detection patterns, appeals, and Signal C usage.
 
+### `GET /badge/{creator_id}`
+- **Summary:** Render a tiny embeddable HTML provenance badge for a creator.
+- **Response `200`:** server-rendered HTML badge showing one of `Verified human creator`, `Verification pending`, or `Not verified`, plus the creator ID and an issuer line.
+- **Example embed:**
+
+```html
+<iframe
+  src="http://127.0.0.1:5000/badge/test-user-1"
+  title="Provenance badge"
+  style="border:0;width:240px;height:82px;overflow:hidden;"
+></iframe>
+```
+
 ### `GET /log`
 - **Summary:** Return recent audit-log entries for inspection.
 - **Query parameters:**

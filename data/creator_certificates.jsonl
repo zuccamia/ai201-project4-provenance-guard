@@ -1,2 +1,6 @@
 {"creator_id":"verified-demo","status":"pending","reason":"demo request","requested_at":"2026-06-29T06:56:24.046385+00:00","method":"manual_review"}
 {"creator_id":"verified-demo","status":"verified_human","reason":"manual review completed","issued_at":"2026-06-29T06:56:24.048288+00:00","method":"manual_review"}
+{"creator_id":"test-user-1","status":"pending","reason":"I want my original writing to display a verified-human badge.","requested_at":"2026-06-29T20:59:19.900269+00:00","method":"manual_review"}
+{"creator_id":"test-user-1","status":"verified_human","reason":"Manual review completed.","issued_at":"2026-06-29T21:00:01.008304+00:00","method":"manual_review"}
+{"creator_id":"pending-user","status":"pending","reason":"demo","requested_at":"2026-06-29T23:06:06.716896+00:00","method":"manual_review"}
+{"creator_id":"verified-user","status":"verified_human","reason":"demo","issued_at":"2026-06-29T23:06:06.719566+00:00","method":"manual_review"}
