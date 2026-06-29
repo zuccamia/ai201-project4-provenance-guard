@@ -1,4 +1,5 @@
 import asyncio
+import logging
 import uuid
 from datetime import datetime, timezone
 
@@ -8,7 +9,7 @@ from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
 
-from app import confidence, label, llm_signal, stylometry
+from app import binoculars_signal, confidence, label, llm_signal, stylometry
 from app.audit import (
     append as audit_append,
     find_by_content_id as audit_find,
@@ -18,9 +19,13 @@ from app.schemas import AppealRequest, AppealResponse, SubmitRequest, SubmitResp
 
 load_dotenv()
 
-# Word-based gate for the current two-signal runtime. Very short text is noisy
-# for both stylometry and the LLM signal, so we short-circuit early.
-MIN_TEXT_WORDS = 50
+logger = logging.getLogger(__name__)
+
+# Global minimum for any classification attempt.
+MIN_TEXT_CHARS = 100
+
+# HF Binoculars endpoint needs longer text than the local two-signal runtime.
+MIN_BINOCULARS_WORDS = 65
 
 # Keyed by client IP. In-memory store is fine for a single-process deployment;
 # if we ever run multi-worker, swap this to a Redis-backed limiter.
@@ -48,7 +53,7 @@ async def submit(request: Request, req: SubmitRequest) -> SubmitResponse:
     content_id = str(uuid.uuid4())
     timestamp = datetime.now(timezone.utc).isoformat()
 
-    if len(req.text.split()) < MIN_TEXT_WORDS:
+    if len(req.text.strip()) < MIN_TEXT_CHARS:
         attribution = "insufficient_text"
         response = SubmitResponse(
             content_id=content_id,
@@ -59,16 +64,33 @@ async def submit(request: Request, req: SubmitRequest) -> SubmitResponse:
             status="classified",
         )
     else:
-        # Fan out the two runtime signals concurrently: stylometry (CPU) and
-        # the LLM vote (Groq HTTP). Slowest of the two sets the latency.
-        sty_features, llm_result = await asyncio.gather(
-            asyncio.to_thread(stylometry.score, req.text),
-            llm_signal.score(req.text),
-        )
+        binoculars_eligible = len(req.text.split()) >= MIN_BINOCULARS_WORDS
+        if binoculars_eligible:
+            sty_features, llm_result, bino_result = await asyncio.gather(
+                asyncio.to_thread(stylometry.score, req.text),
+                llm_signal.score(req.text),
+                binoculars_signal.score(req.text),
+            )
+        else:
+            logger.info(
+                "binoculars skipped: text below %d-word minimum for HF endpoint; falling back to 2-signal fusion",
+                MIN_BINOCULARS_WORDS,
+            )
+            sty_features, llm_result = await asyncio.gather(
+                asyncio.to_thread(stylometry.score, req.text),
+                llm_signal.score(req.text),
+            )
+            bino_result = binoculars_signal.BinocularsResult(tier=None)
 
         p_sty = confidence.calibrate_stylometry(sty_features.raw_score)
         p_llm = confidence.calibrate_llm(llm_result.vote)
-        fused = confidence.fuse(p_sty, p_llm)
+        p_bino = confidence.calibrate_binoculars(bino_result.tier)
+        if p_bino is None:
+            if binoculars_eligible:
+                logger.warning("binoculars unavailable; falling back to 2-signal fusion")
+            fused = confidence.fuse(p_sty, p_llm, weight_profile="two_signal")
+        else:
+            fused = confidence.fuse(p_sty, p_llm, p_bino, weight_profile="three_signal")
 
         response = SubmitResponse(
             content_id=content_id,
@@ -78,6 +100,8 @@ async def submit(request: Request, req: SubmitRequest) -> SubmitResponse:
             confidence=round(fused.confidence, 4),
             stylometry_score=round(fused.stylometry_score, 4) if fused.stylometry_score is not None else None,
             llm_score=round(fused.llm_score, 4) if fused.llm_score is not None else None,
+            binoculars_score=round(fused.binoculars_score, 4) if fused.binoculars_score is not None else None,
+            binoculars_tier=bino_result.tier,
             label_text=label.derive(fused.attribution),
             status="classified",
         )

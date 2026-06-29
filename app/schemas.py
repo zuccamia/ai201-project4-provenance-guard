@@ -19,6 +19,8 @@ class SubmitResponse(BaseModel):
     confidence: Optional[float] = None
     stylometry_score: Optional[float] = None
     llm_score: Optional[float] = None
+    binoculars_score: Optional[float] = None
+    binoculars_tier: Optional[str] = None
     label_text: str
     status: str = "classified"
 

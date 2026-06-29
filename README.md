@@ -6,17 +6,17 @@ A service that classifies a piece of text as human-written or AI-generated and r
 
 A `POST /submit` flows through five stages:
 
-1. **Length gate** (`app/main.py`) — text under 50 words short-circuits to `attribution = insufficient_text`. Very short submissions are noisy for both active signals, so the orchestrator declines to over-interpret them.
-2. **Fan-out** — stylometry runs on CPU via `asyncio.to_thread`; the LLM signal makes two Groq calls. They run concurrently with `asyncio.gather`.
-3. **Calibration + fusion** (`app/confidence.py`) — each raw signal is mapped to P(AI), then combined as a weighted average with current runtime weights `{stylometry: 0.60, llm: 0.40}`. If a signal is missing at request time, its weight is dropped and the remainder renormalized.
-4. **Agreement override + thresholds** — if the two calibrated probabilities disagree by more than 0.40, attribution is forced to `uncertain`. Otherwise the fused score is thresholded: `< 0.35 → likely_human`, `> 0.65 → likely_ai`, else `uncertain`.
+1. **Length gate** (`app/main.py`) — text under 100 characters short-circuits to `attribution = insufficient_text`. Below that, even the local signals are too noisy to over-interpret.
+2. **Fan-out** — stylometry runs on CPU via `asyncio.to_thread`; the LLM signal makes two Groq calls; Binoculars is attempted over HTTP when the text is long enough for the HF endpoint (65+ whitespace-word proxy). The available signals run concurrently with `asyncio.gather`.
+3. **Calibration + fusion** (`app/confidence.py`) — each raw signal is mapped to P(AI), then combined as a weighted average. In 2-signal fallback mode the runtime weights are `{stylometry: 0.70, llm: 0.30}`. When Binoculars is active, the demo uses Binoculars-dominant weights `{stylometry: 0.20, llm: 0.15, binoculars: 0.65}`.
+4. **Agreement override + thresholds** — if the available calibrated probabilities disagree by more than 0.40, attribution is forced to `uncertain`. Otherwise the fused score is thresholded: `< 0.35 → likely_human`, `> 0.65 → likely_ai`, else `uncertain`.
 5. **Audit log + response** — one structured JSON line appended to `logs/audit.jsonl`, response returned with content_id, attribution, calibrated confidence, per-signal scores, and status.
 
 `GET /log` exposes recent audit entries for grading visibility. `POST /appeal` (`app/main.py:87`) accepts a `content_id` and `appeal_reasoning`, appends an appeal record to the audit log, and flips the content's status to `under_review` — original attribution and scores are never overwritten.
 
 ## Detection signals
 
-Two runtime signals are currently wired into the orchestrator, picked to fail differently.
+Three runtime signals are wired into the orchestrator for the current demo, picked to fail differently. Signal C is best-effort: when the Hugging Face Space is unavailable or the text is too short for that endpoint, the service falls back to the 2-signal system and logs the fallback.
 
 **Signal A — Stylometry** (`app/stylometry.py`). Mechanical CPU measurement. Six features: `cliche_density` (LLM-overused phrases per 100 words — "delve into", "in the realm of", "rich tapestry", "whispers of"…), `type_token_ratio`, `low_burstiness` (inverse of sentence-length variance), `contraction_rate`, `caps_irregularity` (ALL-CAPS + lowercase sentence starts), and `punctuation_diversity` (em-dash, semicolon, colon, ellipsis). The first three push toward AI; the last three push toward human.
 
@@ -26,11 +26,16 @@ Two runtime signals are currently wired into the orchestrator, picked to fail di
 
 *Why chosen:* a coarse second opinion that catches things stylometry can't (semantic clichés, register). *What it misses:* modern AI prose with specific imagery — when the model can write voice-driven content, the same model can't detect it.
 
+**Signal C — Binoculars**, via the public Hugging Face Space (`app/binoculars_signal.py`). For the demo, the service calls the Space over HTTP, caches successful responses locally, and maps its coarse output tiers to fixed probabilities: `likely_human -> 0.20`, `uncertain -> 0.50`, `likely_ai -> 0.80`. The endpoint is only attempted for texts with at least 65 whitespace-token words; shorter eligible texts stay on the 2-signal path.
+
+*Why chosen:* in a self-hosted form Binoculars would likely be the strongest signal, so the demo treats it as the dominant vote when available. *What it misses:* the public Space is rate-limited and returns only tiers rather than a continuous score, so this integration is best-effort and intentionally conservative.
+
 ## Confidence scoring
 
 Each raw signal is calibrated to P(AI):
 - Stylometry: Platt logistic `sigmoid(A · raw + B)`, with `A`, `B` fit on the labeled set by max-likelihood gradient ascent.
 - LLM: empirical bucket rates `P(AI | vote)` counted directly from the labeled set.
+- Binoculars: fixed manual tier mapping because the public HF endpoint exposes only coarse labels.
 
 Both fit by `scripts/calibrate.py` against `data/ai_batch_*.jsonl` (Claude/GPT/Gemini outputs, ~90 rows) + `data/human_batch.jsonl` (51 mixed-source human rows). The script also picks attribution thresholds from the fused-score distributions: `THRESHOLD_LOW` = 75th percentile of human fused, `THRESHOLD_HIGH` = 25th percentile of AI fused — so the uncertain band tracks where the distributions actually overlap.
 

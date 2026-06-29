@@ -16,31 +16,40 @@ stylized writing. So the label and the appeal path are core features, not extras
 A CPU orchestrator handles each request. It also calls Groq over HTTP.
 
 This document mixes current implementation notes with planned extensions. In
-the active build, the orchestrator ships with Signals A and B only; Signal C
-below remains design-only.
+the active demo build, the orchestrator ships with Signals A and B plus a
+best-effort Signal C path through the public Binoculars HF Space. Because that
+endpoint is rate-limited and tier-only, Signal C falls back cleanly to the
+2-signal system when unavailable.
 
 ```
                               POST /submit  (raw text)
                                      |
                                      v
                           +---------------------+
-                          |   Length Gate       |
+                           |   Length Gate       |
                           +----+-----------+----+
               too short        |           |  raw text (length OK)
               "insufficient"   |           |
                   label  <-----+           v
-                              fans out to 2 signals (async)
+                               fans out to 2 or 3 signals (async)
                                      |
-                +--------------------+--------------------+
-                |                                         |
-                v                                         v
+         +------+------+-------------------+--------------+
+         |             |                   |              |
+         v             v                   v              v
         +----------------+                     +----------------------+
         | Stylometry     |                     | LLM (Groq)           |
         | CPU, local     |                     | Call A: features     |
         |                |                     | Call B: vote         |
         +-------+--------+                     +----------+-----------+
                 | s_sty (raw)                             | vote + observations
-                +--------------------+--------------------+
+                |                                         |
+                |                               +---------v----------+
+                |                               | Binoculars HF Space|
+                |                               | tier only; cached  |
+                |                               | fallback to 2-sig  |
+                |                               +---------+----------+
+                |                                         | tier
+                +--------------------+--------------------+-------------------+
                                      v
                           +---------------------+
                           | Confidence Scoring  |
@@ -49,8 +58,9 @@ below remains design-only.
                           | agreement; threshold|
                           +----------+----------+
                           confidence, attribution,
-                          stylometry_score, llm_score,
-                          observations
+                           stylometry_score, llm_score,
+                           binoculars_score,
+                           observations
                                      v
                           +---------------------+
                           | Transparency Label  |
@@ -193,10 +203,11 @@ event and flips the status.
 ---
 
 ## Detection signals
-
-Three signals. They are chosen to fail in different ways. Signals A and B are wired into
-the current orchestrator; Signal C is part of the design but not part of the active
-build. When present, the fusion weights rebalance as described below.
+Three signals. They are chosen to fail in different ways. Signals A and B are always
+wired into the current orchestrator. Signal C is wired in for the demo as a best-effort
+remote call to the public Binoculars HF Space; if the endpoint is unavailable or the text
+is too short for that endpoint, the orchestrator logs the fallback and uses the 2-signal
+system. When present, the fusion weights rebalance as described below.
 
 **Signal A — Stylometry.** Measures the shape of the writing. The current implementation
 extracts six features: AI-cliche density (overused LLM phrasings like "delve into",
@@ -216,20 +227,26 @@ The LLM uses two decoupled calls. Call A reports neutral style facts and never m
 human, AI, or detection. Call B maps those facts to a vote. This keeps the rationale from
 being bent to fit a conclusion.
 
-**Signal C — Binoculars.** A likelihood signal. Measures how predictable the text is to
-a reference LLM — lower means more machine-like, higher means more human. It is the
-strongest single AI-detection signal in the literature.
+**Signal C — Binoculars.** A likelihood-style signal. In a self-hosted form it would
+measure how predictable the text is to a reference LLM — lower means more machine-like,
+higher means more human — and it is the strongest single AI-detection signal in the
+literature.
 
-It is not in the current build because it needs two scoring models running together with
-full access to their token probabilities. That requires a GPU and cannot run on a chat
-API like Groq. So it ships as its own service, called over HTTP exactly like Groq.
+For this demo we call the public
+[Binoculars HF Space by tomg-group-umd](https://huggingface.co/spaces/tomg-group-umd/Binoculars)
+over HTTP. That endpoint is strongly rate-limited and returns only coarse tiers rather
+than the original continuous score, so the orchestrator caches successful responses and
+maps the tiers manually to `P(AI)`:
 
-The reference implementation we plan to call is the
-[Binoculars HF Space by tomg-group-umd](https://huggingface.co/spaces/tomg-group-umd/Binoculars),
-likely via `gradio_client`. The GPU service returns a raw ratio; the orchestrator
-calibrates it to `P(AI)` with a fitted logistic, the same way it handles the other
-signals. The raw ratio has the opposite direction (higher = more human) and is not a
-probability, so the calibration step is required before fusion.
+```text
+likely_human -> 0.20
+uncertain    -> 0.50
+likely_ai    -> 0.80
+```
+
+The endpoint is attempted only for texts with at least 65 whitespace-token words. Below
+that threshold, or if the remote call fails, the orchestrator logs the fallback and uses
+the 2-signal system.
 
 A known failure mode of Signal C: it scores well-memorized text as machine-like. A famous
 public-domain poem or a widely-quoted passage can be flagged as AI. This is a structural
@@ -237,7 +254,14 @@ failure of the likelihood approach, not a tuning bug, and it makes the appeal pa
 more.
 
 **Combining them.** The orchestrator calibrates each raw output to `P(AI)`, a value
-between 0 and 1, then takes a weighted average. The design weights:
+between 0 and 1, then takes a weighted average. The active demo uses two weight profiles:
+
+- 2-signal fallback: `stylometry = 0.70`, `llm = 0.30`
+- 3-signal mode with Binoculars active: `stylometry = 0.20`, `llm = 0.15`, `binoculars = 0.65`
+
+The idea is that a self-hosted Binoculars service would likely be the strongest signal, so
+the demo lets the public tiered endpoint dominate when it is available, while still keeping
+the disagreement override in place.
 
 ```
 weights = {binoculars: 0.50, stylometry: 0.35, llm: 0.15}
