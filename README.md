@@ -203,7 +203,7 @@ All three numeric fields in the response (`confidence`, `stylometry_score`, `llm
 ### Example submissions
 
 **AI-labeled dataset example with live Binoculars participation** — `demo-ai-strong`:
-> "Rain hammered the window of my office on the forty-third floor. The dame walked in like trouble wearing a red dress, and trouble was exactly what she was. \"I need you to find someone,\" she said, her voice smoky and low. I lit a cigarette and leaned back. In this city, everybody was looking for someone. The question was always the same: who was looking for them?"
+> Rain hammered the window of my office on the forty-third floor. The dame walked in like trouble wearing a red dress, and trouble was exactly what she was. \"I need you to find someone,\" she said, her voice smoky and low. I lit a cigarette and leaned back. In this city, everybody was looking for someone. The question was always the same: who was looking for them?
 ```json
 {
   "content_id": "1039a9de-6745-455f-9a42-0df47c38279c",
@@ -222,7 +222,7 @@ All three numeric fields in the response (`confidence`, `stylometry_score`, `llm
 This is a useful demo case because Binoculars votes strongly `likely_ai` (`0.8`), stylometry also leans AI (`0.6323`), but the LLM vote stays low (`0.15`). The fused score lands above the AI threshold, yet the pairwise spread exceeds the 0.40 disagreement override, so the final attribution is still `uncertain`.
 
 **Human-labeled dataset example with live Binoculars participation** — `demo-human-strong`:
-> "Edgy technologies and smart designs, cleanliness and convenience, pop culture and the famous cuisine: there are many reasons why Japan is an attractive place to visit and to live. I have worked with candidates from overseas, developing and developed countries, seeking for job opportunities to move to Japan. Many have fallen in love with Japan since childhood through the unique pop culture of games, anime, manga. Others (me included) were impressed by the perfectionism in hospitality, the exciting metropolitan scenes and technology advancement. Living here in long-term, however, would be a different story.",
+> Edgy technologies and smart designs, cleanliness and convenience, pop culture and the famous cuisine: there are many reasons why Japan is an attractive place to visit and to live. I have worked with candidates from overseas, developing and developed countries, seeking for job opportunities to move to Japan. Many have fallen in love with Japan since childhood through the unique pop culture of games, anime, manga. Others (me included) were impressed by the perfectionism in hospitality, the exciting metropolitan scenes and technology advancement. Living here in long-term, however, would be a different story.
 ```json
 {
   "content_id": "9748f621-5f97-4d36-83f4-f9e14937c779",
@@ -260,8 +260,6 @@ The label varies with `attribution`, and `attribution` comes from the fused conf
 | endpoint | limit | status |
 |---|---|---|
 | `POST /submit` | **10 requests / minute** and **100 requests / hour** per IP | Implemented (`app/main.py:43-44`) |
-| `POST /appeal` | 5 / minute per IP | Planned |
-| `GET /log`, `GET /health` | 60 / minute per IP | Planned |
 
 **Why two stacked limits on `/submit`.** A short window catches bursts; a long window caps sustained use. Either trip returns `429 Too Many Requests` with a `Retry-After` header.
 
