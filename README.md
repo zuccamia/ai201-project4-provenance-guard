@@ -4,15 +4,159 @@ A service that classifies a piece of text as human-written or AI-generated and r
 
 ## Architecture overview
 
-A `POST /submit` flows through five stages:
-
-1. **Length gate** (`app/main.py`) — text under 100 characters short-circuits to `attribution = insufficient_text`. Below that, even the local signals are too noisy to over-interpret.
-2. **Fan-out** — stylometry runs on CPU via `asyncio.to_thread`; the LLM signal makes two Groq calls; Binoculars is attempted over HTTP when the text is long enough for the HF endpoint (65+ whitespace-word proxy). The available signals run concurrently with `asyncio.gather`.
-3. **Calibration + fusion** (`app/confidence.py`) — each raw signal is mapped to P(AI), then combined as a weighted average. In 2-signal fallback mode the runtime weights are `{stylometry: 0.70, llm: 0.30}`. When Binoculars is active, the demo uses Binoculars-dominant weights `{stylometry: 0.20, llm: 0.15, binoculars: 0.65}`.
-4. **Agreement override + thresholds** — if the available calibrated probabilities disagree by more than 0.40, attribution is forced to `uncertain`. Otherwise the fused score is thresholded: `< 0.35 → likely_human`, `> 0.65 → likely_ai`, else `uncertain`.
-5. **Audit log + response** — one structured JSON line appended to `logs/audit.jsonl`, response returned with content_id, attribution, calibrated confidence, per-signal scores, and status.
+```text
+                              POST /submit  (raw text)
+                                     |
+                                     v
+                          +---------------------+
+                          |     Length Gate     |
+                          |  <100 chars =>      |
+                          |  insufficient_text  |
+                          +----+-----------+----+
+              too short        |           |  raw text (length OK)
+              short-circuit <---+           v
+                              fans out to 2 or 3 signals (async)
+                                     |
+         +---------------------------+---------------------------+
+         |                           |                           |
+         v                           v                           v
+  +----------------+         +----------------------+   +----------------------+
+  | Stylometry     |         | LLM (Groq)           |   | Binoculars HF Space |
+  | CPU, local     |         | Call A: observations |   | default-on for      |
+  | raw_score      |         | Call B: low/med/high |   | 65+ words; cached   |
+  +-------+--------+         +----------+-----------+   | tier-only response   |
+          |                             |               | fallback to 2-signal |
+          | p_sty                       | p_llm         +----------+-----------+
+          |                             |                          | p_bino
+          +-----------------------------+--------------------------+
+                                        v
+                           +----------------------------+
+                           | Confidence Scoring         |
+                           | calibrate -> P(AI)         |
+                           | fuse by weight profile     |
+                           | disagreement override      |
+                           | thresholds: 0.35 / 0.65    |
+                           +-------------+--------------+
+                                         |
+                                         v
+                           +----------------------------+
+                           | Transparency Label         |
+                           | derive from attribution    |
+                           +-------------+--------------+
+                                         |
+                                         v
+                           +----------------------------+
+                           | Audit Log                  |
+                           | append-only JSONL          |
+                           +-------------+--------------+
+                                         |
+                                         v
+                           +----------------------------+
+                           | Response                   |
+                           | content_id, attribution,   |
+                           | confidence, per-signal     |
+                           | scores, label_text, status |
+                           +----------------------------+
+```
 
 `GET /log` exposes recent audit entries for grading visibility. `POST /appeal` (`app/main.py:87`) accepts a `content_id` and `appeal_reasoning`, appends an appeal record to the audit log, and flips the content's status to `under_review` — original attribution and scores are never overwritten.
+
+## APIs
+
+OpenAPI-style summary of the exposed endpoints:
+
+### `GET /health`
+- **Summary:** Liveness check.
+- **Response `200`:**
+
+```json
+{ "status": "ok" }
+```
+
+### `GET /log`
+- **Summary:** Return recent audit-log entries for inspection.
+- **Query parameters:**
+  - `limit` (`integer`, optional, default `100`) — maximum number of entries to return.
+- **Response `200`:**
+
+```json
+{
+  "entries": [
+    {
+      "content_id": "...",
+      "creator_id": "...",
+      "timestamp": "...",
+      "attribution": "uncertain",
+      "confidence": 0.51,
+      "stylometry_score": 0.67,
+      "llm_score": 0.15,
+      "binoculars_score": 0.20,
+      "binoculars_tier": "likely_human",
+      "label_text": "...",
+      "status": "classified"
+    }
+  ]
+}
+```
+
+### `POST /submit`
+- **Summary:** Classify a text submission and return fused attribution plus per-signal detail.
+- **Rate limits:** `10/minute` and `100/hour` per IP.
+- **Request body:**
+
+```json
+{
+  "text": "Content to analyze.",
+  "creator_id": "user-123"
+}
+```
+
+- **Response `200`:**
+
+```json
+{
+  "content_id": "uuid",
+  "creator_id": "user-123",
+  "timestamp": "2026-06-29T00:54:59.988117+00:00",
+  "attribution": "uncertain",
+  "confidence": 0.2836,
+  "stylometry_score": 0.6553,
+  "llm_score": 0.1500,
+  "binoculars_score": 0.2000,
+  "binoculars_tier": "likely_human",
+  "label_text": "Inconclusive. Our checks did not agree, so we are not confident either way. Treat this as no result, not as a verdict. This case is a good candidate for human review.",
+  "status": "classified"
+}
+```
+
+- **Response semantics:**
+  - `attribution ∈ {likely_ai, likely_human, uncertain, insufficient_text}`
+  - `confidence` is the fused calibrated `P(AI)` when classification runs; `null` for `insufficient_text`
+  - `binoculars_score` / `binoculars_tier` are `null` when Signal C is skipped or unavailable
+
+### `POST /appeal`
+- **Summary:** Append an appeal event for an earlier classification.
+- **Request body:**
+
+```json
+{
+  "content_id": "uuid-from-submit",
+  "appeal_reasoning": "I wrote this myself; English is my second language."
+}
+```
+
+- **Response `200`:**
+
+```json
+{
+  "content_id": "uuid-from-submit",
+  "appeal_id": "appeal-uuid",
+  "timestamp": "2026-06-29T01:00:00+00:00",
+  "status": "under_review"
+}
+```
+
+- **Response `404`:** when `content_id` is not found in the audit log.
 
 ## Detection signals
 
