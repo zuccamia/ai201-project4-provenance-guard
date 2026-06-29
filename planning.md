@@ -15,6 +15,10 @@ stylized writing. So the label and the appeal path are core features, not extras
 
 A CPU orchestrator handles each request. It also calls Groq over HTTP.
 
+This document mixes current implementation notes with planned extensions. In
+the active build, the orchestrator ships with Signals A and B only; Signal C
+below remains design-only.
+
 ```
                               POST /submit  (raw text)
                                      |
@@ -74,13 +78,13 @@ A CPU orchestrator handles each request. It also calls Groq over HTTP.
                           +---------------------+
 
 
-                              POST /appeal  ({content_id, creator_reasoning})
+                              POST /appeal  ({content_id, appeal_reasoning})
                                      |
                                      v
                           +---------------------+
                           | Status Update       |
                           | fetch record;       |
-                          | mark "appealed";    |
+                          | mark "under_review";|
                           | attach reasoning    |
                           +----------+----------+
                           updated_status, reasoning
@@ -103,8 +107,8 @@ A CPU orchestrator handles each request. It also calls Groq over HTTP.
 **Submission flow.** A user posts text. The orchestrator gates on length, scores it with
 two signals, fuses them, derives the label, logs the decision, and returns the result.
 
-**Appeal flow.** A user posts a `content_id` and their `creator_reasoning`. The system marks that
-record as appealed, appends an appeal event to the log, and returns a confirmation. The
+**Appeal flow.** A user posts a `content_id` and their `appeal_reasoning`. The system marks that
+record as `under_review`, appends an appeal event to the log, and returns a confirmation. The
 original record is never overwritten.
 
 ---
@@ -129,6 +133,7 @@ Response fields:
 - `confidence` (float): the calibrated 0–1 score behind the attribution.
 - `stylometry_score` (float): the stylometry signal's calibrated score (per-signal detail).
 - `llm_score` (float): the LLM signal's calibrated score (per-signal detail).
+- `label_text` (string): the transparency label text derived from `attribution`, shown to the user.
 - `status` (string): `classified` on success.
 
 ```bash
@@ -146,6 +151,7 @@ curl -s -X POST http://localhost:5000/submit \
   "confidence": 0.78,
   "stylometry_score": 0.72,
   "llm_score": 0.81,
+  "label_text": "Likely AI-generated. Our automated checks agree this text shows machine-generation patterns. This is an automated estimate, not proof. You can appeal this result.",
   "status": "classified"
 }
 ```
@@ -156,26 +162,26 @@ Files an appeal against a past classification.
 
 Request fields:
 - `content_id` (string): the id from the `/submit` response.
-- `creator_reasoning` (string): why the creator believes the result is wrong.
+- `appeal_reasoning` (string): why the creator believes the result is wrong.
 
 Response fields:
 - `content_id` (string): echoed back.
-- `status` (string): now `appealed`.
+- `status` (string): now `under_review`.
 - `appeal_id` (string): id for this appeal event.
 - `timestamp` (string): ISO-8601 UTC time of the appeal.
 
 ```bash
 curl -s -X POST http://localhost:5000/appeal \
   -H "Content-Type: application/json" \
-  -d '{"content_id": "PASTE-CONTENT-ID-HERE", "creator_reasoning": "I wrote this myself from personal experience. I am a non-native English speaker and my writing style may appear more formal than typical."}'
+  -d '{"content_id": "PASTE-CONTENT-ID-HERE", "appeal_reasoning": "I wrote this myself from personal experience. I am a non-native English speaker and my writing style may appear more formal than typical."}'
 ```
 
 ```json
 {
   "content_id": "3f7a2b1e-...",
   "appeal_id": "a91c4d7f-...",
-  "status": "appealed",
-  "creator_reasoning": "I wrote this myself from personal experience. I am a non-native English speaker and my writing style may appear more formal than typical.",
+  "status": "under_review",
+  "appeal_reasoning": "I wrote this myself from personal experience. I am a non-native English speaker and my writing style may appear more formal than typical.",
   "original_attribution": "likely_ai",
   "timestamp": "2025-04-01T15:10:44.456Z"
 }
@@ -188,11 +194,19 @@ event and flips the status.
 
 ## Detection signals
 
-Two signals. They are chosen to fail in different ways.
+Three signals. They are chosen to fail in different ways. Signals A and B are wired into
+the current orchestrator; Signal C is part of the design but not part of the active
+build. When present, the fusion weights rebalance as described below.
 
-**Signal A — Stylometry.** Measures the shape of the writing. It looks at burstiness,
-sentence-length variance, function-word use, and punctuation. Runs on CPU. Output is a
-raw score or a small feature vector. It is a mechanical measurement, not a judgment.
+**Signal A — Stylometry.** Measures the shape of the writing. The current implementation
+extracts six features: AI-cliche density (overused LLM phrasings like "delve into",
+"whispers of"), type-token ratio, low-burstiness (inverse of sentence-length variance),
+contraction rate, capitalization irregularity (ALL-CAPS plus lowercase sentence starts),
+and punctuation diversity (em-dashes, semicolons, ellipses). Runs on CPU. Output is a
+feature vector summarized into a raw 0–1 score. It is a mechanical measurement, not a
+judgment. The original spec listed only burstiness, function-word use, and punctuation;
+calibration against the labeled set showed those alone were anti-correlated with AI on
+poetry-heavy data, which is what drove the feature-set expansion.
 
 **Signal B — LLM (Groq `llama-3.3-70b-versatile`).** Gives a coarse vote plus
 human-readable observations. Output is a low/medium/high vote. Its self-reported
@@ -202,17 +216,46 @@ The LLM uses two decoupled calls. Call A reports neutral style facts and never m
 human, AI, or detection. Call B maps those facts to a vote. This keeps the rationale from
 being bent to fit a conclusion.
 
+**Signal C — Binoculars.** A likelihood signal. Measures how predictable the text is to
+a reference LLM — lower means more machine-like, higher means more human. It is the
+strongest single AI-detection signal in the literature.
+
+It is not in the current build because it needs two scoring models running together with
+full access to their token probabilities. That requires a GPU and cannot run on a chat
+API like Groq. So it ships as its own service, called over HTTP exactly like Groq.
+
+The reference implementation we plan to call is the
+[Binoculars HF Space by tomg-group-umd](https://huggingface.co/spaces/tomg-group-umd/Binoculars),
+likely via `gradio_client`. The GPU service returns a raw ratio; the orchestrator
+calibrates it to `P(AI)` with a fitted logistic, the same way it handles the other
+signals. The raw ratio has the opposite direction (higher = more human) and is not a
+probability, so the calibration step is required before fusion.
+
+A known failure mode of Signal C: it scores well-memorized text as machine-like. A famous
+public-domain poem or a widely-quoted passage can be flagged as AI. This is a structural
+failure of the likelihood approach, not a tuning bug, and it makes the appeal path matter
+more.
+
 **Combining them.** The orchestrator calibrates each raw output to `P(AI)`, a value
-between 0 and 1. It then takes a weighted average. Stylometry gets the edge because it is
-a real measurement. The LLM gets meaningful but smaller weight because it over-flags.
+between 0 and 1, then takes a weighted average. The design weights:
 
 ```
-weights = {stylometry: 0.60, llm: 0.40}
+weights = {binoculars: 0.50, stylometry: 0.35, llm: 0.15}
 fused   = weighted average of the calibrated P(AI) values
 ```
 
-If a signal is missing, it is dropped. The remaining weight is renormalized. A missing
-signal is never treated as a vote.
+Binoculars carries the most weight because it's the strongest single signal. The LLM
+weight is kept low because it shares a likelihood prior with Binoculars (both reason
+from token probabilities, even if one is implicit), so without the down-weight the
+ensemble would double-count that kind of evidence.
+
+If a signal is missing at request time, it is dropped and the remaining weights are
+renormalized over their sum. A missing signal is never treated as a vote.
+
+Until Signal C is wired in, the orchestrator runs A and B only, with hardcoded weights
+`{stylometry: 0.60, llm: 0.40}` (see `app/confidence.py:WEIGHTS`). Adding Signal C is a
+two-step change: bring up the Binoculars HTTP client and switch the weight table to the
+three-signal design above.
 
 ---
 
@@ -256,7 +299,8 @@ before measuring, since the bucket rates only describe that exact prompt.
 
 Three variants. Each one should change how the reader treats the result. The label is
 derived from `attribution`: `likely_ai`, `likely_human`, `uncertain`, and the short-input
-case map one-to-one to the four variants below. It is not a separate response field.
+case map one-to-one to the four variants below. It is returned as the `label_text` field
+on the `/submit` response and is also written into the audit log entry.
 
 **High-confidence AI:**
 > Likely AI-generated. Our automated checks agree this text shows machine-generation
@@ -280,10 +324,10 @@ A fourth case exists for very short input:
 **Who can appeal.** Anyone who received a result. They use the `content_id` from the
 response.
 
-**What they provide.** The `content_id` and a short reason (`creator_reasoning`). For example: "this is a
+**What they provide.** The `content_id` and a short reason (`appeal_reasoning`). For example: "this is a
 public-domain poem," or "I wrote this; English is my second language."
 
-**What the system does.** It looks up the record. It marks the status as `appealed`. It
+**What the system does.** It looks up the record. It marks the status as `under_review`. It
 attaches the user's reason. It appends an appeal event to the audit log. It returns an
 `appeal_id`. It never edits the original attribution or scores.
 
@@ -339,7 +383,7 @@ isolation, then wire it in.
 - **Provide:** Transparency label design, Appeals workflow, and the diagram.
 - **Ask for:** the label generation logic and the `/appeal` endpoint.
 - **Verify:** craft inputs that land in each band so all three labels appear. Submit an
-  appeal and confirm the record status changes to `appealed` and a log entry is written.
+  appeal and confirm the record status changes to `under_review` and a log entry is written.
 
 **Prompting note.** Give one milestone at a time. Paste only the named sections. Ask for
 small functions, not whole files. Small asks are easier to verify and less likely to

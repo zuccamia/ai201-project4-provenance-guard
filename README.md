@@ -6,17 +6,17 @@ A service that classifies a piece of text as human-written or AI-generated and r
 
 A `POST /submit` flows through five stages:
 
-1. **Length gate** (`app/main.py:33`) — text under 100 characters short-circuits to `attribution = insufficient_text`. Below that threshold no signal has enough material to be meaningful.
+1. **Length gate** (`app/main.py`) — text under 50 words short-circuits to `attribution = insufficient_text`. Very short submissions are noisy for both active signals, so the orchestrator declines to over-interpret them.
 2. **Fan-out** — stylometry runs on CPU via `asyncio.to_thread`; the LLM signal makes two Groq calls. They run concurrently with `asyncio.gather`.
-3. **Calibration + fusion** (`app/confidence.py`) — each raw signal is mapped to P(AI), then combined as a weighted average (0.60 stylometry, 0.40 LLM). If a signal is missing, its weight is dropped and the remainder is renormalized.
+3. **Calibration + fusion** (`app/confidence.py`) — each raw signal is mapped to P(AI), then combined as a weighted average with current runtime weights `{stylometry: 0.60, llm: 0.40}`. If a signal is missing at request time, its weight is dropped and the remainder renormalized.
 4. **Agreement override + thresholds** — if the two calibrated probabilities disagree by more than 0.40, attribution is forced to `uncertain`. Otherwise the fused score is thresholded: `< 0.35 → likely_human`, `> 0.65 → likely_ai`, else `uncertain`.
 5. **Audit log + response** — one structured JSON line appended to `logs/audit.jsonl`, response returned with content_id, attribution, calibrated confidence, per-signal scores, and status.
 
-`GET /log` exposes recent audit entries for grading visibility. `POST /appeal` (planned) records creator reasoning and updates the audit log.
+`GET /log` exposes recent audit entries for grading visibility. `POST /appeal` (`app/main.py:87`) accepts a `content_id` and `appeal_reasoning`, appends an appeal record to the audit log, and flips the content's status to `under_review` — original attribution and scores are never overwritten.
 
 ## Detection signals
 
-Two signals, picked to fail differently.
+Two runtime signals are currently wired into the orchestrator, picked to fail differently.
 
 **Signal A — Stylometry** (`app/stylometry.py`). Mechanical CPU measurement. Six features: `cliche_density` (LLM-overused phrases per 100 words — "delve into", "in the realm of", "rich tapestry", "whispers of"…), `type_token_ratio`, `low_burstiness` (inverse of sentence-length variance), `contraction_rate`, `caps_irregularity` (ALL-CAPS + lowercase sentence starts), and `punctuation_diversity` (em-dash, semicolon, colon, ellipsis). The first three push toward AI; the last three push toward human.
 
@@ -39,9 +39,17 @@ Validation is honest: the script prints the confusion matrix under the fitted co
 **Fusion:**
 
 ```
-P_fused = (w_sty · P_sty + w_llm · P_llm) / (w_sty + w_llm)        # weights = {0.60, 0.40}
-if |P_sty − P_llm| > 0.40:  attribution = "uncertain"               # disagreement override
+weights = {stylometry: 0.60, llm: 0.40}                            # app/confidence.py:WEIGHTS
+
+P_fused = weighted average of available calibrated P(AI) values    # missing signals are dropped + remaining renormalized
+if |P_i − P_j| > 0.40:  attribution = "uncertain"                  # disagreement override (pairwise)
 ```
+
+The current runtime uses stylometry + LLM only, with stylometry slightly heavier because it is deterministic and available on every request. If one signal is missing at request time, its weight is dropped and the remainder is renormalized.
+
+### Reading the score fields
+
+All three numeric fields in the response (`confidence`, `stylometry_score`, `llm_score`) are calibrated probabilities on the same scale: `0.0` means "highly confident human," `1.0` means "highly confident AI," `0.5` is a coin flip. `stylometry_score` is continuous (a Platt logistic over six features). `llm_score` is a categorical lookup, so it can only take as many distinct values as there are vote buckets. The exact numbers in `LLM_BUCKET_P_AI` in `app/confidence.py` are refit by `scripts/calibrate.py`.
 
 ### Example submissions
 
@@ -73,26 +81,38 @@ Both signals expected to agree. Spread = <TBD>, expected well under the 0.40 ove
 
 ## Transparency label
 
-Derived from `attribution` and shown verbatim to the user:
+Derived from `attribution` and returned to the client as `label_text`. The exact wording per variant comes from `planning.md` §"Transparency label design"; the per-attribution mapping is implemented in `app/label.py`:
 
 | attribution | label text |
 |---|---|
-| `likely_ai` | "Likely AI-generated (confidence: <TBD>%). This is a triage signal, not a final ruling. If this assessment is wrong, you can appeal." |
-| `likely_human` | "Likely human-written (confidence: <TBD>%)." |
-| `uncertain` | "Could not determine with confidence (P(AI) = <TBD>%). The two detection signals disagreed or the score is borderline. No attribution is being made." |
-| `insufficient_text` | "Text too short to evaluate — need at least 100 characters." |
+| `likely_ai` | "Likely AI-generated. Our automated checks agree this text shows machine-generation patterns. This is an automated estimate, not proof. You can appeal this result." |
+| `likely_human` | "Likely human-written. Our automated checks agree this text shows human-writing patterns. This is an automated estimate, not proof." |
+| `uncertain` | "Inconclusive. Our checks did not agree, so we are not confident either way. Treat this as no result, not as a verdict. This case is a good candidate for human review." |
+| `insufficient_text` | "Not enough text to analyze reliably. Please submit a longer passage." |
 
-Each label embeds the calibrated probability so a reader can sanity-check the call rather than trust the verdict on faith.
+The label varies with `attribution`, and `attribution` comes from the fused confidence thresholds (`< 0.35` → likely_human, `> 0.65` → likely_ai, between → uncertain), the spread-based disagreement override into `uncertain`, and the short-text gate into `insufficient_text`. The numeric scores (`confidence`, `stylometry_score`, `llm_score`) ship alongside `label_text` in the response so a reader can sanity-check the verdict rather than trust the label on faith.
 
 ## Rate limiting
 
-Planned (to be wired via `slowapi`), with the following limits and reasoning:
+`POST /submit` is rate-limited via `slowapi` (in-process, IP-keyed) with two stacked limits:
 
-| endpoint | limit | reasoning |
+| endpoint | limit | status |
 |---|---|---|
-| `POST /submit` | 10 / min per creator_id | Each call costs 2 Groq requests. A human-driven workflow rarely exceeds this; the cap contains accidental loops and bulk abuse without blocking legitimate testing. |
-| `POST /appeal` | 5 / min per creator_id | Appeals require human-written reasoning; rate-limit lower to discourage automation. |
-| `GET /log`, `GET /health` | 60 / min per IP | Read-only and cheap; loose limit just to deter scraping. |
+| `POST /submit` | **10 requests / minute** and **100 requests / hour** per IP | Implemented (`app/main.py:43-44`) |
+| `POST /appeal` | 5 / minute per IP | Planned |
+| `GET /log`, `GET /health` | 60 / minute per IP | Planned |
+
+**Why two stacked limits on `/submit`.** A short window catches bursts; a long window caps sustained use. Either trip returns `429 Too Many Requests` with a `Retry-After` header.
+
+**Why these specific numbers.**
+
+*Realistic upper bound for a human writer iterating on their own work.* Each submission needs ~10–30 seconds of "read result, decide, edit" before the next one — so a real ceiling is **~6 submissions per minute** during active drafting, dropping to far less when the writer pauses to think. Over an hour of intensive work, **30–60 submissions** is a heavy session; sustained 6/min for a full hour is uncommon and probably reflects iteration on a very rough draft.
+
+*The chosen numbers sit just above that.* `10/min` gives a writer headroom over their realistic peak (60% slack) without leaving room for a script firing once per second. `100/hour` accommodates intense sessions (up to ~10 minutes of peak-rate iteration, plus pauses) but stops a script from sustaining 6/min for hours.
+
+*Why the limits matter.* Each `/submit` triggers two Groq calls against `llama-3.3-70b-versatile`, so a runaway script could exhaust the API quota in minutes. The audit log would also fill with noise that drowns out real submissions. Rate-limiting per IP is the standard defense — `creator_id` lives in the request body and is trivially spoofable, so it isn't a useful key.
+
+*What we accept by choosing per-IP.* Users sharing an IP (school WiFi, corporate NAT) share the limit. For a class demo this is fine. In production this would either need per-account keys behind authentication or X-Forwarded-For handling with a trusted proxy.
 
 ## Known limitations
 

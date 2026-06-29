@@ -11,6 +11,11 @@ Prints the resulting constants ready to paste into app/confidence.py.
 Usage:
     python scripts/calibrate.py
     python scripts/calibrate.py --rebuild         # re-run signals, ignore cache
+    python scripts/calibrate.py --re-stylometry-only   # refresh raw_sty only
+
+The cache (data/calibration_cache.jsonl) stores partial results, so a re-run
+fills in only the signals that are missing per row — useful when Groq
+rate-limits us partway through.
 """
 import argparse
 import asyncio
@@ -33,7 +38,22 @@ DATA_DIR = Path("data")
 AI_FILES = ["ai_batch_claude.jsonl", "ai_batch_gemini.jsonl", "ai_batch_gpt.jsonl"]
 HUMAN_FILES = ["human_batch.jsonl"]
 CACHE_PATH = DATA_DIR / "calibration_cache.jsonl"
-MIN_TEXT_CHARS = 100  # match app/main.py
+MIN_TEXT_CHARS = 100
+
+DEFAULT_W_STY = 0.60
+DEFAULT_W_LLM = 0.40
+WEIGHT_CANDIDATES: list[tuple[float, float]] = [
+    (0.70, 0.30),
+    (0.60, 0.40),
+    (0.50, 0.50),
+    (0.40, 0.60),
+]
+MANUAL_THRESHOLD_CANDIDATES: list[tuple[float, float]] = [
+    (0.35, 0.65),
+    (0.35, 0.70),
+    (0.30, 0.70),
+    (0.30, 0.75),
+]
 
 
 # ---------- data loading -----------------------------------------------------
@@ -96,8 +116,8 @@ def load_cache() -> dict[str, dict]:
 
 
 def rewrite_cache(cache: dict[str, dict]) -> None:
-    """Atomically replace the cache file. Used when entries need updating in
-    place — append_cache is for fresh entries only."""
+    """Atomically replace the cache file. Used to compact the file after a
+    run (or to update raw_sty in place during --re-stylometry-only)."""
     CACHE_PATH.parent.mkdir(parents=True, exist_ok=True)
     tmp = CACHE_PATH.with_suffix(CACHE_PATH.suffix + ".tmp")
     with tmp.open("w", encoding="utf-8") as f:
@@ -109,6 +129,10 @@ def rewrite_cache(cache: dict[str, dict]) -> None:
 def append_cache(entry: dict) -> None:
     with CACHE_PATH.open("a", encoding="utf-8") as f:
         f.write(json.dumps(entry) + "\n")
+
+
+def _word_count(text: str) -> int:
+    return len(text.split())
 
 
 async def collect_signals(rows: list[dict], rebuild: bool, concurrency: int,
@@ -143,58 +167,93 @@ async def collect_signals(rows: list[dict], rebuild: bool, concurrency: int,
             else:
                 row["vote"] = None
             print(f"  [{i+1:>3}/{len(rows)}]  {row['label']:<5}  "
-                  f"sty={row['raw_sty']:.3f}  vote={row['vote']}  (no LLM call)")
+                  f"sty={row['raw_sty']:.3f}  vote={row['vote']}  (no Groq calls)")
         rewrite_cache(cache)
         print(f"\n  recomputed stylometry for {len(rows)} rows; "
-              f"kept LLM votes for {have_votes} of them")
+              f"kept {have_votes} LLM votes")
         return
 
     sem = asyncio.Semaphore(concurrency)
 
     cached_hits = 0
+    partial_cache_hits = 0
     new_success = 0
     new_short = 0
     new_failure = 0
 
     async def process(row: dict, i: int) -> None:
-        nonlocal cached_hits, new_success, new_short, new_failure
+        nonlocal cached_hits, partial_cache_hits, new_success, new_short, new_failure
         h = text_hash(row["text"])
-        cached = cache.get(h)
-        # Trust the cache only for prior successes or known-short rows.
-        if cached is not None and (cached.get("vote") is not None or cached.get("short")):
-            row["raw_sty"] = cached["raw_sty"]
-            row["vote"] = cached["vote"]
+        cached = cache.get(h, {})
+
+        # Known-short rows: no signals to run, just propagate cached marker.
+        if cached.get("short"):
+            row["raw_sty"] = cached.get("raw_sty", 0.5)
+            row["vote"] = None
             cached_hits += 1
             return
 
-        row["raw_sty"] = stylometry.score(row["text"]).raw_score
+        # Stylometry: reuse if cached, recompute otherwise (cheap either way).
+        row["raw_sty"] = cached.get("raw_sty") or stylometry.score(row["text"]).raw_score
+
         short = len(row["text"].strip()) < MIN_TEXT_CHARS
+        had_llm = cached.get("vote") is not None
+
         if short:
             row["vote"] = None
+            if not cached.get("short"):
+                new_short += 1
         else:
-            async with sem:
-                result = await llm_signal.score(row["text"])
-            row["vote"] = result.vote
+            # LLM: reuse cache if present, else fetch.
+            if had_llm:
+                row["vote"] = cached["vote"]
+            else:
+                async with sem:
+                    result = await llm_signal.score(row["text"])
+                row["vote"] = result.vote
+                if row["vote"] is None:
+                    new_failure += 1
+                else:
+                    new_success += 1
+        # Bookkeeping for the summary line.
+        if cached and had_llm:
+            cached_hits += 1
+        elif cached:
+            partial_cache_hits += 1
 
-        if row["vote"] is not None or short:
-            entry: dict = {"hash": h, "label": row["label"],
-                           "raw_sty": row["raw_sty"], "vote": row["vote"]}
+        # Cache the entry if something is worth saving.
+        keep = short or row["vote"] is not None
+        if keep:
+            entry: dict = {
+                "hash": h, "label": row["label"],
+                "raw_sty": row["raw_sty"],
+                "vote": row["vote"],
+            }
             if short:
                 entry["short"] = True
-                new_short += 1
-            else:
-                new_success += 1
             cache[h] = entry
             append_cache(entry)
-        else:
-            new_failure += 1
-        marker = "ok" if row["vote"] is not None else ("short" if short else "FAIL")
-        print(f"  [{i+1:>3}/{len(rows)}]  {row['label']:<5}  sty={row['raw_sty']:.3f}  vote={row['vote']}  {marker}")
+
+        marker = "short" if short else (
+            "OK" if row["vote"] is not None
+            else "partial"
+        )
+        print(f"  [{i+1:>3}/{len(rows)}]  {row['label']:<5}  "
+              f"sty={row['raw_sty']:.3f}  vote={row['vote']}  {marker}")
 
     await asyncio.gather(*[process(r, i) for i, r in enumerate(rows)])
 
-    print(f"\n  cache hits: {cached_hits}   new ok: {new_success}   "
-          f"new short: {new_short}   FAILED (will retry next run): {new_failure}")
+    # Compact the cache file after the run.
+    rewrite_cache(cache)
+
+    print(
+        f"\n  cache hits: {cached_hits}   partial cache hits: {partial_cache_hits}   "
+        f"new ok: {new_success}   "
+        f"new short: {new_short}   "
+        f"FAILED (will retry next run): {new_failure}"
+    )
+    if new_failure:
+        print("  (failures aren't cached; rerun the same command to retry them.)")
 
 
 # ---------- fitting ----------------------------------------------------------
@@ -223,20 +282,27 @@ def fit_platt(xs: list[float], ys: list[int], iters: int = 3000, lr: float = 0.1
     return a, b
 
 
-def fit_bucket_rates(rows: list[dict]) -> tuple[dict[str, Optional[float]], dict[str, int]]:
-    buckets: dict[str, list[int]] = {"low": [], "medium": [], "high": []}
+def fit_bucket_rates(rows: list[dict], field: str, buckets: tuple[str, ...]
+                     ) -> tuple[dict[str, Optional[float]], dict[str, int]]:
+    """Empirical P(AI | bucket) for any categorical signal field.
+    `field` is the row dict key (e.g. 'vote', 'bino_verdict'); `buckets` is
+    the list of valid bucket labels."""
+    grouped: dict[str, list[int]] = {b: [] for b in buckets}
     for row in rows:
-        if row["vote"] in buckets:
-            buckets[row["vote"]].append(1 if row["label"] == "ai" else 0)
+        v = row.get(field)
+        if v in grouped:
+            grouped[v].append(1 if row["label"] == "ai" else 0)
     rates: dict[str, Optional[float]] = {}
     counts: dict[str, int] = {}
-    for v, ys in buckets.items():
-        counts[v] = len(ys)
-        rates[v] = (sum(ys) / len(ys)) if ys else None
+    for b in buckets:
+        ys = grouped[b]
+        counts[b] = len(ys)
+        rates[b] = (sum(ys) / len(ys)) if ys else None
     return rates, counts
 
 
-def fuse(p_sty: Optional[float], p_llm: Optional[float], w_sty: float = 0.60, w_llm: float = 0.40) -> float:
+def fuse(p_sty: Optional[float], p_llm: Optional[float],
+         w_sty: float, w_llm: float) -> float:
     contribs = []
     if p_sty is not None:
         contribs.append((w_sty, p_sty))
@@ -248,6 +314,15 @@ def fuse(p_sty: Optional[float], p_llm: Optional[float], w_sty: float = 0.60, w_
     return sum(w * p for w, p in contribs) / total
 
 
+def calibrated_fused(row: dict, a: float, b: float,
+                     llm_rates: dict[str, Optional[float]],
+                     w_sty: float, w_llm: float) -> float:
+    vote = row.get("vote")
+    p_sty = sigmoid(a * row["raw_sty"] + b)
+    p_llm = llm_rates.get(vote) if vote else None
+    return fuse(p_sty, p_llm, w_sty, w_llm)
+
+
 def percentile(sorted_vals: list[float], p: float) -> float:
     if not sorted_vals:
         return 0.5
@@ -257,35 +332,36 @@ def percentile(sorted_vals: list[float], p: float) -> float:
     return sorted_vals[lo] + (sorted_vals[hi] - sorted_vals[lo]) * (k - lo)
 
 
-def pick_thresholds(rows: list[dict], a: float, b: float, rates: dict[str, Optional[float]]) -> tuple[float, float, list[float], list[float]]:
-    """THRESHOLD_LOW = 75th-percentile of human fused scores (≥75% of humans
-    correctly land below it). THRESHOLD_HIGH = 25th-percentile of AI fused
-    scores (≥75% of AI correctly land above it). Where the two distributions
-    overlap, the gap becomes the 'uncertain' band — honest about ambiguity."""
+def pick_thresholds(rows: list[dict], a: float, b: float,
+                    llm_rates: dict[str, Optional[float]],
+                    w_sty: float, w_llm: float
+                    ) -> tuple[float, float, list[float], list[float]]:
+    """THRESHOLD_LOW = 75th-percentile of human fused scores; THRESHOLD_HIGH =
+    25th-percentile of AI fused scores. Where the two distributions overlap,
+    the gap is the 'uncertain' band — honest about ambiguity."""
     ai_scores: list[float] = []
     hu_scores: list[float] = []
     for row in rows:
-        p_sty = sigmoid(a * row["raw_sty"] + b)
-        p_llm = rates.get(row["vote"]) if row["vote"] else None
-        f = fuse(p_sty, p_llm)
-        (ai_scores if row["label"] == "ai" else hu_scores).append(f)
+        s = calibrated_fused(row, a, b, llm_rates, w_sty, w_llm)
+        (ai_scores if row["label"] == "ai" else hu_scores).append(s)
     ai_scores.sort()
     hu_scores.sort()
     return percentile(hu_scores, 75), percentile(ai_scores, 25), ai_scores, hu_scores
 
 
-def confusion(rows: list[dict], a: float, b: float, rates: dict[str, Optional[float]], t_lo: float, t_hi: float) -> dict[str, dict[str, int]]:
+def confusion(rows: list[dict], a: float, b: float,
+              llm_rates: dict[str, Optional[float]],
+              t_lo: float, t_hi: float,
+              w_sty: float, w_llm: float) -> dict[str, dict[str, int]]:
     out: dict[str, dict[str, int]] = {
         "ai": {"likely_ai": 0, "likely_human": 0, "uncertain": 0},
         "human": {"likely_ai": 0, "likely_human": 0, "uncertain": 0},
     }
     for row in rows:
-        p_sty = sigmoid(a * row["raw_sty"] + b)
-        p_llm = rates.get(row["vote"]) if row["vote"] else None
-        f = fuse(p_sty, p_llm)
-        if f < t_lo:
+        s = calibrated_fused(row, a, b, llm_rates, w_sty, w_llm)
+        if s < t_lo:
             attr = "likely_human"
-        elif f > t_hi:
+        elif s > t_hi:
             attr = "likely_ai"
         else:
             attr = "uncertain"
@@ -293,11 +369,18 @@ def confusion(rows: list[dict], a: float, b: float, rates: dict[str, Optional[fl
     return out
 
 
+def separation_score(ai_scores: list[float], hu_scores: list[float]) -> float:
+    if not ai_scores or not hu_scores:
+        return float("-inf")
+    return percentile(ai_scores, 50) - percentile(hu_scores, 50)
+
+
 # ---------- entrypoint -------------------------------------------------------
 
 async def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--rebuild", action="store_true", help="ignore cache, re-run all signals")
+    parser.add_argument("--rebuild", action="store_true",
+                        help="ignore cache, re-run all signals")
     parser.add_argument("--re-stylometry-only", action="store_true",
                         help="recompute stylometry only; keep cached LLM votes (no Groq calls)")
     parser.add_argument("--concurrency", type=int, default=2,
@@ -327,37 +410,90 @@ async def main() -> int:
     print(f"  A = {platt_a:.4f}   B = {platt_b:.4f}")
 
     print("\nFitting LLM bucket rates...")
-    rates, counts = fit_bucket_rates(long_rows)
+    rates, counts = fit_bucket_rates(long_rows, "vote", ("low", "medium", "high"))
     for v in ("low", "medium", "high"):
         rate = rates[v]
         rate_s = f"{rate:.4f}" if rate is not None else "n/a"
         print(f"  P(AI | {v:<6}) = {rate_s}   (n = {counts[v]})")
-    n_none = sum(1 for r in long_rows if r["vote"] is None)
+    n_none = sum(1 for r in long_rows if r.get("vote") is None)
     if n_none:
         print(f"  {n_none} rows had no LLM vote — dropped from bucket fit, "
               f"still scored stylometry-only for thresholds")
 
-    print("\nPicking thresholds from fused-score distributions...")
-    t_lo, t_hi, fused_ai, fused_hu = pick_thresholds(long_rows, platt_a, platt_b, rates)
-    print(f"  THRESHOLD_LOW  = {t_lo:.4f}   (75th-pctile of human fused)")
-    print(f"  THRESHOLD_HIGH = {t_hi:.4f}   (25th-pctile of AI fused)")
-    if t_lo > t_hi:
-        print("  WARNING: thresholds cross — the two signals don't cleanly "
-              "separate this dataset. Treat results with extra caution.")
-    print(f"  human fused: min={min(fused_hu):.3f} median={percentile(fused_hu, 50):.3f} max={max(fused_hu):.3f}")
-    print(f"  ai    fused: min={min(fused_ai):.3f} median={percentile(fused_ai, 50):.3f} max={max(fused_ai):.3f}")
+    print("\nEvaluating fusion-weight candidates...")
+    best: Optional[dict] = None
+    for w_sty, w_llm in WEIGHT_CANDIDATES:
+        t_lo, t_hi, fused_ai, fused_hu = pick_thresholds(
+            long_rows, platt_a, platt_b, rates, w_sty, w_llm
+        )
+        sep = separation_score(fused_ai, fused_hu)
+        crossed = t_lo > t_hi
+        gap = t_hi - t_lo
+        print(f"\n  weights stylometry={w_sty:.2f}  llm={w_llm:.2f}")
+        print(f"    THRESHOLD_LOW  = {t_lo:.4f}   (75th-pctile of human fused)")
+        print(f"    THRESHOLD_HIGH = {t_hi:.4f}   (25th-pctile of AI fused)")
+        print(f"    gap = {gap:.4f}   median separation = {sep:.4f}")
+        if crossed:
+            print("    WARNING: thresholds cross — the fused distributions don't cleanly separate.")
+        if fused_hu:
+            print(f"    human fused: min={min(fused_hu):.3f} median={percentile(fused_hu, 50):.3f} max={max(fused_hu):.3f}")
+        if fused_ai:
+            print(f"    ai    fused: min={min(fused_ai):.3f} median={percentile(fused_ai, 50):.3f} max={max(fused_ai):.3f}")
 
-    print("\nConfusion under fitted constants:")
-    mat = confusion(long_rows, platt_a, platt_b, rates, t_lo, t_hi)
-    header = f"{'':10}{'likely_ai':>12}{'likely_human':>14}{'uncertain':>12}"
-    print(header)
-    for label in ("ai", "human"):
-        r = mat[label]
-        print(f"  {label:<8}{r['likely_ai']:>12}{r['likely_human']:>14}{r['uncertain']:>12}")
+        print("    confusion:")
+        mat = confusion(long_rows, platt_a, platt_b, rates, t_lo, t_hi, w_sty, w_llm)
+        header = f"{'':12}{'likely_ai':>12}{'likely_human':>14}{'uncertain':>12}"
+        print("    " + header)
+        for label in ("ai", "human"):
+            r = mat[label]
+            print(f"      {label:<8}{r['likely_ai']:>12}{r['likely_human']:>14}{r['uncertain']:>12}")
+
+        candidate = {
+            "w_sty": w_sty,
+            "w_llm": w_llm,
+            "t_lo": t_lo,
+            "t_hi": t_hi,
+            "sep": sep,
+            "crossed": crossed,
+            "gap": gap,
+        }
+        if best is None:
+            best = candidate
+        else:
+            best_key = (best["crossed"], -best["gap"], -best["sep"])
+            cand_key = (candidate["crossed"], -candidate["gap"], -candidate["sep"])
+            if cand_key < best_key:
+                best = candidate
+
+    assert best is not None
+    t_lo = best["t_lo"]
+    t_hi = best["t_hi"]
+    best_w_sty = best["w_sty"]
+    best_w_llm = best["w_llm"]
+
+    print("\nSelected weight setting for pasted constants:")
+    print(f"  stylometry={best_w_sty:.2f}  llm={best_w_llm:.2f}")
+    if best["crossed"]:
+        print("  WARNING: even the best candidate still has crossed thresholds.")
+
+    print("\nEvaluating manual threshold candidates under selected weights...")
+    header = f"{'':12}{'likely_ai':>12}{'likely_human':>14}{'uncertain':>12}"
+    for manual_t_lo, manual_t_hi in MANUAL_THRESHOLD_CANDIDATES:
+        print(f"\n  THRESHOLD_LOW={manual_t_lo:.2f}  THRESHOLD_HIGH={manual_t_hi:.2f}")
+        mat = confusion(
+            long_rows, platt_a, platt_b, rates,
+            manual_t_lo, manual_t_hi,
+            best_w_sty, best_w_llm,
+        )
+        print("    " + header)
+        for label in ("ai", "human"):
+            r = mat[label]
+            print(f"      {label:<8}{r['likely_ai']:>12}{r['likely_human']:>14}{r['uncertain']:>12}")
 
     print("\n" + "=" * 60)
     print("Paste into app/confidence.py (replace the matching constants):")
     print("=" * 60)
+    print(f"WEIGHTS = {{'stylometry': {best_w_sty:.2f}, 'llm': {best_w_llm:.2f}}}")
     print(f"STYLOMETRY_PLATT_A = {platt_a:.4f}")
     print(f"STYLOMETRY_PLATT_B = {platt_b:.4f}")
     print("LLM_BUCKET_P_AI: dict[str, float] = {")
