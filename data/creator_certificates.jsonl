@@ -4,3 +4,8 @@
 {"creator_id":"test-user-1","status":"verified_human","reason":"Manual review completed.","issued_at":"2026-06-29T21:00:01.008304+00:00","method":"manual_review"}
 {"creator_id":"pending-user","status":"pending","reason":"demo","requested_at":"2026-06-29T23:06:06.716896+00:00","method":"manual_review"}
 {"creator_id":"verified-user","status":"verified_human","reason":"demo","issued_at":"2026-06-29T23:06:06.719566+00:00","method":"manual_review"}
+{"creator_id":"test-user-2","status":"pending","reason":"I want my original writing to display a verified-human badge.","requested_at":"2026-06-29T23:43:26.798581+00:00","method":"manual_review"}
+{"creator_id":"test-user-2","status":"verified_human","reason":"Manual review completed.","issued_at":"2026-06-29T23:43:37.021826+00:00","method":"manual_review"}
+{"creator_id":"test-user-2","status":"pending","reason":"I want my original writing to display a verified-human badge.","requested_at":"2026-06-29T23:43:56.513299+00:00","method":"manual_review"}
+{"creator_id":"idempotent-new","status":"pending","reason":"first","requested_at":"2026-06-29T23:47:35.282855+00:00","method":"manual_review"}
+{"creator_id":"idempotent-verified","status":"verified_human","reason":"approve","issued_at":"2026-06-29T23:47:35.286431+00:00","method":"manual_review"}

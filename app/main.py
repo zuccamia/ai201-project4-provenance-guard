@@ -5,12 +5,12 @@ from datetime import datetime, timezone
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, Response
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
 
-from app import analytics, binoculars_signal, confidence, label, llm_signal, provenance, stylometry
+from app import analytics, badge, binoculars_signal, confidence, label, llm_signal, provenance, stylometry
 from app.audit import (
     append as audit_append,
     find_by_content_id as audit_find,
@@ -65,83 +65,29 @@ async def analytics_view() -> HTMLResponse:
     return HTMLResponse(content=analytics.render_html(summary))
 
 
+@app.get("/badge/{creator_id}.svg")
+async def badge_svg(creator_id: str) -> Response:
+    return Response(content=badge.render_svg(creator_id), media_type="image/svg+xml")
+
+
 @app.get("/badge/{creator_id}", response_class=HTMLResponse)
 async def badge_view(creator_id: str) -> HTMLResponse:
-    creator_status = provenance.get_creator_status(creator_id)
-    status = creator_status.get("status")
-    if status == "verified_human":
-        text = "Verified human creator"
-        bg = "#e8f7ec"
-        fg = "#166534"
-        border = "#86efac"
-    elif status == "pending":
-        text = "Verification pending"
-        bg = "#fff7ed"
-        fg = "#9a3412"
-        border = "#fdba74"
-    else:
-        text = "Not verified"
-        bg = "#f3f4f6"
-        fg = "#374151"
-        border = "#d1d5db"
-    html = f"""<!doctype html>
-<html lang=\"en\">
-<head>
-  <meta charset=\"utf-8\">
-  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">
-  <style>
-    html, body {{ margin: 0; padding: 0; background: transparent; }}
-    body {{ font-family: -apple-system, BlinkMacSystemFont, sans-serif; }}
-    .badge {{
-      display: inline-flex;
-      flex-direction: column;
-      align-items: flex-start;
-      gap: 0.25rem;
-      padding: 0.55rem 0.75rem;
-      border-radius: 14px;
-      border: 1px solid {border};
-      background: {bg};
-      color: {fg};
-      min-width: 220px;
-      box-sizing: border-box;
-    }}
-    .topline {{
-      display: inline-flex;
-      align-items: center;
-      gap: 0.45rem;
-      font: 600 14px/1.2 -apple-system, BlinkMacSystemFont, sans-serif;
-      white-space: nowrap;
-    }}
-    .dot {{
-      width: 0.55rem;
-      height: 0.55rem;
-      border-radius: 999px;
-      background: {fg};
-      display: inline-block;
-    }}
-    .creator {{
-      font: 500 12px/1.2 -apple-system, BlinkMacSystemFont, sans-serif;
-      color: #111827;
-    }}
-    .issuer {{
-      font: 400 11px/1.2 -apple-system, BlinkMacSystemFont, sans-serif;
-      color: #6b7280;
-    }}
-  </style>
-</head>
-<body>
-  <span class=\"badge\">
-    <span class=\"topline\"><span class=\"dot\"></span>{text}</span>
-    <span class=\"creator\">Creator: {creator_id}</span>
-    <span class=\"issuer\">Issued by Provenance Guard</span>
-  </span>
-</body>
-</html>"""
-    return HTMLResponse(content=html)
+    return HTMLResponse(content=badge.render_html(creator_id))
 
 
 @app.post("/verify/request", response_model=VerifyResponse)
 async def verify_request(req: VerifyRequest) -> VerifyResponse:
+    current = provenance.get_creator_status(req.creator_id)
+    current_status = current.get("status")
+    if current_status == "verified_human":
+        return VerifyResponse(
+            creator_id=req.creator_id,
+            status="verified_human",
+            issued_at=current.get("issued_at"),
+        )
+    if current_status == "pending":
+        return VerifyResponse(creator_id=req.creator_id, status="pending")
+
     timestamp = datetime.now(timezone.utc).isoformat()
     entry = {
         "creator_id": req.creator_id,

@@ -148,6 +148,8 @@ OpenAPI-style summary of the exposed endpoints:
 }
 ```
 
+Repeated requests are idempotent: if the creator is already `pending`, the endpoint returns `pending` again without appending a duplicate request; if already `verified_human`, it returns the current verified status and does not downgrade the creator back to pending.
+
 ### `POST /verify/approve`
 - **Summary:** Demo/admin endpoint to approve a creator as `verified_human`.
 - **Request body:**
@@ -209,6 +211,22 @@ The resulting certificate is displayed on later `/submit` responses as `verifica
 ### `GET /badge/{creator_id}`
 - **Summary:** Render a tiny embeddable HTML provenance badge for a creator.
 - **Response `200`:** server-rendered HTML badge showing one of `Verified human creator`, `Verification pending`, or `Not verified`, plus the creator ID and an issuer line.
+- **Badge preview:**
+
+The preview assets in `docs/` are generated from the same SVG badge function used by the live endpoint (`scripts/generate_badge_previews.py`).
+
+**Verified human creator**
+
+![Verified badge](docs/badge-verified.svg)
+
+**Verification pending**
+
+![Pending badge](docs/badge-pending.svg)
+
+**Not verified**
+
+![Unverified badge](docs/badge-unverified.svg)
+
 - **Example embed:**
 
 ```html
@@ -217,6 +235,20 @@ The resulting certificate is displayed on later `/submit` responses as `verifica
   title="Provenance badge"
   style="border:0;width:240px;height:82px;overflow:hidden;"
 ></iframe>
+```
+
+### `GET /badge/{creator_id}.svg`
+- **Summary:** Return the same badge as an SVG image for simpler embedding.
+- **Response `200`:** `image/svg+xml`
+- **Example embed:**
+
+```html
+<img
+  src="http://127.0.0.1:5000/badge/test-user-1.svg"
+  alt="Provenance badge"
+  width="240"
+  height="82"
+/>
 ```
 
 ### `GET /log`
